@@ -12,10 +12,11 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 |---|---|---|
 | `@aivm/casefile` | Investigation external brain — leads, evidence, entities, dead-ends, timeline, FTS, digest | ✅ built · tested · typechecked |
 | `@aivm/artifacts` | Content-addressed store — sha256 = id, provenance, cache, ranged reads | ✅ built · tested · typechecked |
-| `@aivm/acquisition` | `fetch` (HTML→text+summary, URL-cached) + Wayback archive lookup/get | ✅ built · tested · typechecked |
-| `recon` / `swarm` / `identify` / … | discovery, P2P, identification | 📋 designed |
+| `@aivm/acquisition` | `fetch` (HTML→text+summary, URL-cached) · Wayback archive · `download` (stream + yt-dlp) | ✅ built · tested · typechecked |
+| `@aivm/recon` | Source abstraction + federated `discover()` · SearXNG surface source · coverage | ✅ built · tested · typechecked |
+| `swarm` / `identify` / `profiles` / … | P2P, identification, domain profiles | 📋 designed |
 
-The two cores compose: an artifact's `id` is what a case file's `artifactId` points at, so the brain stores *references* and the agent pulls bytes only on demand. See `packages/artifacts/examples/demo.ts`.
+The packages compose into one investigation loop: **`discover()` → `fetch()`/`download()` → artifact → case-file evidence**, with content-addressed dedup and per-source coverage. See `packages/recon/examples/demo.ts` (runs end-to-end, no external services).
 
 ## Stack
 

@@ -1,0 +1,13 @@
+{
+  "name": "@aivm/recon",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Reconnaissance: Source abstraction + federated query planner. discover() fans one intent across surface/archive/deep/dark.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
+    "demo": "node --disable-warning=ExperimentalWarning examples/demo.ts"
+  }
+}
