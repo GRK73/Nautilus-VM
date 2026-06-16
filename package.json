@@ -11,9 +11,11 @@
     "node": ">=22.5"
   },
   "scripts": {
-    "typecheck": "tsc -b",
-    "test": "node --test --disable-warning=ExperimentalWarning packages/casefile/test/casefile.test.ts",
-    "demo:casefile": "node --disable-warning=ExperimentalWarning packages/casefile/examples/demo.ts"
+    "test": "node --test --disable-warning=ExperimentalWarning",
+    "typecheck": "tsc -p packages/casefile/tsconfig.json && tsc -p packages/artifacts/tsconfig.json && tsc -p packages/acquisition/tsconfig.json",
+    "demo:casefile": "node --disable-warning=ExperimentalWarning packages/casefile/examples/demo.ts",
+    "demo:artifacts": "node --disable-warning=ExperimentalWarning packages/artifacts/examples/demo.ts",
+    "demo:acquisition": "node --disable-warning=ExperimentalWarning packages/acquisition/examples/demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

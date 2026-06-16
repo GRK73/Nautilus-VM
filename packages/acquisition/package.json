@@ -1,0 +1,13 @@
+{
+  "name": "@aivm/acquisition",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Acquisition layer: fetch (HTML→text+summary, cached) and web-archive retrieval into the artifact store.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
+    "demo": "node --disable-warning=ExperimentalWarning examples/demo.ts"
+  }
+}
