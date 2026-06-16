@@ -59,4 +59,4 @@ export interface OcrResult {
   summary: string;
 }
 
-export type ToolName = 'ffprobe' | 'fpcalc' | 'whisper' | 'tesseract';
+export type ToolName = 'ffprobe' | 'ffmpeg' | 'fpcalc' | 'whisper' | 'tesseract';

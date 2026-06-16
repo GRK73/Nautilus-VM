@@ -150,5 +150,14 @@ export function buildTools(ctx: ToolContext): Tool[] {
       inputSchema: obj({ artifactId: str('image artifact id'), lang: str('tesseract lang, optional') }, ['artifactId']),
       handler: async (a) => ctx.identifier.ocr(a.artifactId, { lang: a.lang }),
     },
+    {
+      name: 'identify_frames',
+      description: 'Extract keyframes from a video artifact as image artifacts (then OCR them to identify a source). Returns artifact ids.',
+      inputSchema: obj({ artifactId: str('video artifact id'), everySec: num('seconds between frames'), limit: num('max frames') }, ['artifactId']),
+      handler: async (a) => {
+        const frames = await ctx.identifier.frames(a.artifactId, { everySec: a.everySec, limit: a.limit });
+        return { count: frames.length, frames: frames.map((f) => ({ artifactId: f.id, title: f.title })) };
+      },
+    },
   ];
 }

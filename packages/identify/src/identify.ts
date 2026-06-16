@@ -1,4 +1,8 @@
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ArtifactStore } from '../../artifacts/src/index.ts';
+import type { Artifact } from '../../artifacts/src/index.ts';
 import { defaultRunner, which } from './runner.ts';
 import type {
   AcoustIDMatch,
@@ -14,6 +18,7 @@ import type {
 
 const INSTALL_HINT: Record<ToolName, string> = {
   ffprobe: 'ffmpeg (provides ffprobe)',
+  ffmpeg: 'ffmpeg',
   fpcalc: 'chromaprint (provides fpcalc)',
   whisper: 'whisper.cpp (whisper-cli) or openai-whisper',
   tesseract: 'tesseract-ocr',
@@ -36,6 +41,12 @@ export interface TranscribeOptions {
 }
 export interface OcrOptions {
   lang?: string;
+}
+export interface FramesOptions {
+  /** Sample one frame every N seconds. Default 10. */
+  everySec?: number;
+  /** Max frames to extract. Default 12. */
+  limit?: number;
 }
 
 interface FfStream {
@@ -77,6 +88,7 @@ export class Identifier {
     this.#acoustidBase = (opts.acoustidBase ?? 'https://api.acoustid.org').replace(/\/+$/, '');
     this.#bins = {
       ffprobe: opts.bins?.ffprobe ?? 'ffprobe',
+      ffmpeg: opts.bins?.ffmpeg ?? 'ffmpeg',
       fpcalc: opts.bins?.fpcalc ?? 'fpcalc',
       whisper: opts.bins?.whisper ?? 'whisper-cli',
       tesseract: opts.bins?.tesseract ?? 'tesseract',
@@ -193,5 +205,41 @@ export class Identifier {
     const out = await this.#run('tesseract', [path, 'stdout', '-l', opts.lang ?? 'eng']);
     const text = out.trim();
     return { text, summary: text.replace(/\s+/g, ' ').slice(0, 200) };
+  }
+
+  /**
+   * ffmpeg → extract keyframes from a video artifact, each stored as its own
+   * image artifact (so they can be OCR'd / reverse-searched to identify a source).
+   * Returns the new image artifacts.
+   */
+  async frames(artifactId: string, opts: FramesOptions = {}): Promise<Artifact[]> {
+    const everySec = opts.everySec ?? 10;
+    const limit = opts.limit ?? 12;
+    const src = this.#store.path(artifactId);
+    const outDir = mkdtempSync(join(tmpdir(), 'aivm_frames_'));
+    try {
+      const pattern = join(outDir, 'frame_%03d.png');
+      // -vf fps=1/N → one frame per N seconds; cap with -frames:v
+      await this.#run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', src, '-vf', `fps=1/${everySec}`, '-frames:v', String(limit), '-y', pattern]);
+      const files = readdirSync(outDir)
+        .filter((f) => f.endsWith('.png'))
+        .sort();
+      const out: Artifact[] = [];
+      for (let i = 0; i < files.length; i++) {
+        out.push(
+          await this.#store.ingestFile(join(outDir, files[i]!), {
+            mime: 'image/png',
+            kind: 'image',
+            title: `frame ${i + 1} @~${i * everySec}s`,
+            source: artifactId,
+            method: 'identify.frame',
+            detail: { fromArtifact: artifactId, index: i, approxSec: i * everySec },
+          }),
+        );
+      }
+      return out;
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
   }
 }

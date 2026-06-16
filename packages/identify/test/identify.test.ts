@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { ArtifactStore } from '../../artifacts/src/index.ts';
 import { Identifier } from '../src/index.ts';
 import type { ToolResult, ToolRunner } from '../src/index.ts';
@@ -126,6 +126,36 @@ test('ocr captures tesseract stdout', async () => {
   try {
     const r = await new Identifier(store, { runner }).ocr(id);
     assert.equal(r.text, 'CHANNEL 7 NEWS 1987');
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('frames extracts keyframes into image artifacts', async () => {
+  const { store, id, dir } = storeWithBlob();
+  // fake ffmpeg: write 3 PNGs to the output pattern's directory
+  const runner: ToolRunner = {
+    async run(bin, args): Promise<ToolResult> {
+      if (bin === 'ffmpeg') {
+        const pattern = args[args.length - 1]!;
+        const outDir = dirname(pattern);
+        for (let i = 1; i <= 3; i++) writeFileSync(join(outDir, `frame_00${i}.png`), Buffer.from([0x89, 0x50, 0x4e, 0x47, i]));
+        return { status: 0, stdout: '', stderr: '' };
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  };
+  try {
+    const frames = await new Identifier(store, { runner }).frames(id, { everySec: 5 });
+    assert.equal(frames.length, 3);
+    assert.equal(frames[0]!.kind, 'image');
+    assert.equal(frames[0]!.mime, 'image/png');
+    // provenance points back at the source video artifact
+    assert.equal(frames[0]!.sources[0]!.method, 'identify.frame');
+    assert.equal((frames[0]!.sources[0]!.detail as any).fromArtifact, id);
+    // all three are distinct content-addressed artifacts
+    assert.equal(new Set(frames.map((f) => f.id)).size, 3);
   } finally {
     store.close();
     rmSync(dir, { recursive: true, force: true });
