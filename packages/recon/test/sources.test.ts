@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { AhmiaSource, InternetArchiveSource, ProwlarrSource, Recon } from '../src/index.ts';
+import { AhmiaSource, BitmagnetSource, InternetArchiveSource, ProwlarrSource, Recon } from '../src/index.ts';
 
 async function listen(handler: Parameters<typeof createServer>[1]): Promise<{ base: string; server: Server }> {
   const server = createServer(handler);
@@ -61,6 +61,47 @@ test('ProwlarrSource sends api key and maps releases (seeders = score)', async (
     assert.equal(hits[0]!.tier, 'deep');
     assert.equal(hits[0]!.score, 12);
     assert.match(hits[0]!.snippet, /BTN.*torrent.*1\.4GB.*12 seeders/);
+  } finally {
+    server.close();
+  }
+});
+
+// ---- bitmagnet (deep tier) — GraphQL DHT search ----
+
+test('BitmagnetSource queries GraphQL and maps items to magnet candidates', async () => {
+  const payload = {
+    data: {
+      torrentContent: {
+        search: {
+          items: [
+            { infoHash: '0123456789abcdef0123456789abcdef01234567', contentType: 'movie', title: 'Lost.Film.1987', seeders: 42, leechers: 3, torrent: { name: 'Lost.Film.1987.mkv', size: 1_500_000_000 } },
+            { infoHash: null, title: 'dropped — no hash' },
+          ],
+        },
+      },
+    },
+  };
+  let sawGraphql = false;
+  const { base, server } = await listen((req, res) => {
+    if (req.method === 'POST') {
+      sawGraphql = (req.url ?? '').includes('/graphql');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(payload));
+    } else {
+      res.writeHead(200);
+      res.end('bitmagnet');
+    }
+  });
+  try {
+    const src = new BitmagnetSource(base);
+    assert.equal(await src.available(), true);
+    const hits = await src.search('lost film 1987');
+    assert.ok(sawGraphql, 'should POST to /graphql');
+    assert.equal(hits.length, 1, 'hash-less item dropped');
+    assert.equal(hits[0]!.tier, 'deep');
+    assert.equal(hits[0]!.score, 42);
+    assert.match(hits[0]!.url, /^magnet:\?xt=urn:btih:0123456789abcdef0123456789abcdef01234567/);
+    assert.match(hits[0]!.snippet, /movie.*1\.4GB.*42 seeders/);
   } finally {
     server.close();
   }

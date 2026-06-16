@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { CaseFile } from '../../../packages/casefile/src/index.ts';
 import { ArtifactStore } from '../../../packages/artifacts/src/index.ts';
 import { Acquirer, Downloader } from '../../../packages/acquisition/src/index.ts';
-import { Recon, SearXNGSource, InternetArchiveSource, ProwlarrSource, AhmiaSource } from '../../../packages/recon/src/index.ts';
+import { Recon, SearXNGSource, InternetArchiveSource, ProwlarrSource, AhmiaSource, BitmagnetSource } from '../../../packages/recon/src/index.ts';
 import { Swarm, QBittorrentAdapter, AmuleAdapter } from '../../../packages/swarm/src/index.ts';
 import { Identifier, HttpReverseImageProvider } from '../../../packages/identify/src/index.ts';
 import { TorClient } from '../../../packages/tor/src/index.ts';
@@ -67,6 +67,10 @@ export function buildVM(opts: WireOptions): WiredVM {
   if (env.PROWLARR_URL && env.PROWLARR_API_KEY) {
     recon.addSource(new ProwlarrSource(env.PROWLARR_URL, env.PROWLARR_API_KEY));
     enabled.push('prowlarr');
+  }
+  if (env.BITMAGNET_URL) {
+    recon.addSource(new BitmagnetSource(env.BITMAGNET_URL));
+    enabled.push('bitmagnet');
   }
 
   // swarm: adapters when configured

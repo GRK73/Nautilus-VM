@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "nautilus": {
+      "command": "node",
+      "args": ["--disable-warning=ExperimentalWarning", "apps/mcp/src/stdio.ts"],
+      "env": { "NAUTILUS_WORKDIR": "./cases/mcp", "NAUTILUS_PROFILE": "" }
+    }
+  }
+}

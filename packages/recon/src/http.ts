@@ -4,6 +4,8 @@ export const DEFAULT_TIMEOUT = 12_000;
 export interface HttpOptions {
   timeoutMs?: number;
   headers?: Record<string, string>;
+  method?: string;
+  body?: string;
 }
 
 /** fetch() with an abort timeout and a default UA. */
@@ -14,6 +16,8 @@ export async function fetchWithTimeout(url: string, opts: HttpOptions = {}): Pro
     return await fetch(url, {
       redirect: 'follow',
       signal: ac.signal,
+      method: opts.method ?? 'GET',
+      body: opts.body,
       headers: { 'user-agent': DEFAULT_UA, ...opts.headers },
     });
   } finally {

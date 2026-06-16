@@ -13,7 +13,7 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 | `@aivm/casefile` | Investigation external brain — leads, evidence, entities, dead-ends, timeline, FTS, digest | ✅ built · tested · typechecked |
 | `@aivm/artifacts` | Content-addressed store — sha256 = id, provenance, cache, ranged reads | ✅ built · tested · typechecked |
 | `@aivm/acquisition` | `fetch` (HTML→text+summary, URL-cached) · Wayback archive · `download` (stream + yt-dlp) | ✅ built · tested · typechecked |
-| `@aivm/recon` | Federated `discover()` across 4 tiers · SearXNG (surface) · Internet Archive (archive) · Prowlarr (deep) · Ahmia (dark) · coverage | ✅ built · tested · typechecked |
+| `@aivm/recon` | Federated `discover()` across 4 tiers · SearXNG (surface) · Internet Archive (archive) · Prowlarr + **bitmagnet DHT** (deep) · Ahmia (dark) · coverage | ✅ built · tested · typechecked |
 | `@aivm/swarm` | Unified job-based P2P · qBittorrent (BT) + amuled (eD2k/Kad) adapters · URI routing · search-by-health | ✅ built · tested · typechecked |
 | `@aivm/identify` | Binary → text clue: ffprobe · audio fingerprint (chromaprint+AcoustID) · transcribe (whisper) · OCR (tesseract) | ✅ built · tested · typechecked |
 | `@aivm/runtime` | **The VM surface** — wires every package into 19 tools Claude can drive (Agent SDK / Messages API `tool_use`) | ✅ built · tested · typechecked |
@@ -53,7 +53,7 @@ for (const block of response.content) {
 ```bash
 ANTHROPIC_API_KEY=… npm run agent -- --profile=jp_media --workdir=./cases/jingle \
   "Find the 1995 Japanese radio jingle with a synth melody and no vocals"
-# optional sources via env: SEARXNG_URL, PROWLARR_URL/PROWLARR_API_KEY,
+# optional sources via env: SEARXNG_URL, PROWLARR_URL/PROWLARR_API_KEY, BITMAGNET_URL,
 #                           QBITTORRENT_URL/USER/PASS, AMULE_PASSWORD, ACOUSTID_KEY
 ```
 

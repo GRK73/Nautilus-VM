@@ -8,6 +8,8 @@ export { ProwlarrSource } from './sources/prowlarr.ts';
 export type { ProwlarrOptions } from './sources/prowlarr.ts';
 export { AhmiaSource } from './sources/ahmia.ts';
 export type { AhmiaOptions } from './sources/ahmia.ts';
+export { BitmagnetSource } from './sources/bitmagnet.ts';
+export type { BitmagnetOptions } from './sources/bitmagnet.ts';
 export type {
   Source,
   SourceTier,
