@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ArtifactStore } from '../../artifacts/src/index.ts';
-import { Identifier } from '../src/index.ts';
+import { Identifier, HttpReverseImageProvider } from '../src/index.ts';
 import type { ToolResult, ToolRunner } from '../src/index.ts';
 
 const FFPROBE_JSON = JSON.stringify({
@@ -156,6 +156,43 @@ test('frames extracts keyframes into image artifacts', async () => {
     assert.equal((frames[0]!.sources[0]!.detail as any).fromArtifact, id);
     // all three are distinct content-addressed artifacts
     assert.equal(new Set(frames.map((f) => f.id)).size, 3);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('reverseImage uploads the image and maps matches', async () => {
+  const { store, id, dir } = storeWithBlob();
+  let sawMultipart = false;
+  const server: Server = await new Promise((resolve) => {
+    const s = createServer((req, res) => {
+      sawMultipart = (req.headers['content-type'] ?? '').startsWith('multipart/form-data');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ results: [{ url: 'https://frame.example/match', title: 'Found in Episode 7', source: 'fan-wiki', score: 0.88 }, { title: 'no url, dropped' }] }));
+    });
+    s.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const provider = new HttpReverseImageProvider(`${base}/reverse`);
+    const r = await new Identifier(store, { reverseImageProvider: provider }).reverseImage(id);
+    assert.ok(sawMultipart, 'image must be uploaded as multipart/form-data');
+    assert.equal(r.matches.length, 1);
+    assert.equal(r.matches[0]!.title, 'Found in Episode 7');
+    assert.equal(r.matches[0]!.source, 'fan-wiki');
+    assert.match(r.summary, /Found in Episode 7/);
+  } finally {
+    server.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('reverseImage without a provider gives actionable guidance', async () => {
+  const { store, id, dir } = storeWithBlob();
+  try {
+    await assert.rejects(() => new Identifier(store).reverseImage(id), /no reverse-image provider configured.*REVERSE_IMAGE_URL/s);
   } finally {
     store.close();
     rmSync(dir, { recursive: true, force: true });

@@ -59,4 +59,24 @@ export interface OcrResult {
   summary: string;
 }
 
+/** One visual match for an image (reverse image search). */
+export interface ReverseImageMatch {
+  url: string;
+  title: string | null;
+  source: string | null;
+  thumbnail: string | null;
+  score?: number;
+}
+
+export interface ReverseImageResult {
+  matches: ReverseImageMatch[];
+  summary: string;
+}
+
+/** Pluggable reverse-image backend (no clean free API exists — bring your own). */
+export interface ReverseImageProvider {
+  readonly name: string;
+  search(image: Uint8Array, opts?: { mime?: string; filename?: string; limit?: number }): Promise<ReverseImageMatch[]>;
+}
+
 export type ToolName = 'ffprobe' | 'ffmpeg' | 'fpcalc' | 'whisper' | 'tesseract';

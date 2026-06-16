@@ -5,7 +5,7 @@ import { ArtifactStore } from '../../../packages/artifacts/src/index.ts';
 import { Acquirer, Downloader } from '../../../packages/acquisition/src/index.ts';
 import { Recon, SearXNGSource, InternetArchiveSource, ProwlarrSource, AhmiaSource } from '../../../packages/recon/src/index.ts';
 import { Swarm, QBittorrentAdapter, AmuleAdapter } from '../../../packages/swarm/src/index.ts';
-import { Identifier } from '../../../packages/identify/src/index.ts';
+import { Identifier, HttpReverseImageProvider } from '../../../packages/identify/src/index.ts';
 import { Nautilus } from '../../../packages/runtime/src/index.ts';
 import { getProfile, isProfileName } from '../../../packages/profiles/src/index.ts';
 import type { Profile } from '../../../packages/profiles/src/index.ts';
@@ -70,8 +70,12 @@ export function buildVM(opts: WireOptions): WiredVM {
     enabled.push('amuled');
   }
 
-  const identifier = new Identifier(store, { acoustidKey: env.ACOUSTID_KEY });
+  const identifier = new Identifier(store, {
+    acoustidKey: env.ACOUSTID_KEY,
+    reverseImageProvider: env.REVERSE_IMAGE_URL ? new HttpReverseImageProvider(env.REVERSE_IMAGE_URL) : undefined,
+  });
   if (env.ACOUSTID_KEY) enabled.push('acoustid');
+  if (env.REVERSE_IMAGE_URL) enabled.push('reverse-image');
 
   const vm = new Nautilus({ caseFile, store, acquirer, downloader, recon, swarm, identifier });
 

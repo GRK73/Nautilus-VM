@@ -9,6 +9,8 @@ import type {
   FingerprintResult,
   MediaInfo,
   OcrResult,
+  ReverseImageProvider,
+  ReverseImageResult,
   StreamInfo,
   StreamType,
   ToolName,
@@ -31,6 +33,13 @@ export interface IdentifyOptions {
   acoustidBase?: string;
   /** Override binary names/paths. */
   bins?: Partial<Record<ToolName, string>>;
+  /** Backend for reverse image search (none = image_reverse errors with guidance). */
+  reverseImageProvider?: ReverseImageProvider;
+}
+
+export interface ReverseImageOptions {
+  provider?: ReverseImageProvider;
+  limit?: number;
 }
 
 export interface FingerprintOptions {
@@ -80,11 +89,13 @@ export class Identifier {
   #acoustidKey: string | undefined;
   #acoustidBase: string;
   #bins: Record<ToolName, string>;
+  #reverseProvider: ReverseImageProvider | undefined;
 
   constructor(store: ArtifactStore, opts: IdentifyOptions = {}) {
     this.#store = store;
     this.#runner = opts.runner ?? defaultRunner;
     this.#acoustidKey = opts.acoustidKey;
+    this.#reverseProvider = opts.reverseImageProvider;
     this.#acoustidBase = (opts.acoustidBase ?? 'https://api.acoustid.org').replace(/\/+$/, '');
     this.#bins = {
       ffprobe: opts.bins?.ffprobe ?? 'ffprobe',
@@ -205,6 +216,20 @@ export class Identifier {
     const out = await this.#run('tesseract', [path, 'stdout', '-l', opts.lang ?? 'eng']);
     const text = out.trim();
     return { text, summary: text.replace(/\s+/g, ' ').slice(0, 200) };
+  }
+
+  /** Reverse image search via a configured provider → visual matches (find a clip's source). */
+  async reverseImage(artifactId: string, opts: ReverseImageOptions = {}): Promise<ReverseImageResult> {
+    const provider = opts.provider ?? this.#reverseProvider;
+    if (!provider) {
+      throw new Error('no reverse-image provider configured. Set REVERSE_IMAGE_URL (a self-hosted/proxy backend), or use vm.exec a scraper.');
+    }
+    const art = this.#store.get(artifactId);
+    if (!art) throw new Error(`unknown artifact: ${artifactId}`);
+    const bytes = this.#store.read(artifactId);
+    const matches = await provider.search(bytes, { mime: art.mime, filename: art.title ?? 'image', limit: opts.limit ?? 20 });
+    const summary = matches.length ? `${matches.length} visual match(es); top: ${matches[0]!.title ?? matches[0]!.url}` : 'no visual matches';
+    return { matches, summary };
   }
 
   /**

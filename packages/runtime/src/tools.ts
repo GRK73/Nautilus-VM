@@ -151,6 +151,12 @@ export function buildTools(ctx: ToolContext): Tool[] {
       handler: async (a) => ctx.identifier.ocr(a.artifactId, { lang: a.lang }),
     },
     {
+      name: 'image_reverse',
+      description: 'Reverse image search an image artifact → visual matches (find where a clip/screenshot came from). Needs a configured provider.',
+      inputSchema: obj({ artifactId: str('image artifact id') }, ['artifactId']),
+      handler: async (a) => ctx.identifier.reverseImage(a.artifactId),
+    },
+    {
       name: 'identify_frames',
       description: 'Extract keyframes from a video artifact as image artifacts (then OCR them to identify a source). Returns artifact ids.',
       inputSchema: obj({ artifactId: str('video artifact id'), everySec: num('seconds between frames'), limit: num('max frames') }, ['artifactId']),
