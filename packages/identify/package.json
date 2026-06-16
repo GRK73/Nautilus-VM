@@ -1,0 +1,13 @@
+{
+  "name": "@aivm/identify",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Turn binary artifacts into text clues: ffprobe, audio fingerprint (chromaprint+AcoustID), transcription, OCR.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
+    "demo": "node --disable-warning=ExperimentalWarning examples/demo.ts"
+  }
+}

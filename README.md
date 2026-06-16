@@ -15,7 +15,8 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 | `@aivm/acquisition` | `fetch` (HTML→text+summary, URL-cached) · Wayback archive · `download` (stream + yt-dlp) | ✅ built · tested · typechecked |
 | `@aivm/recon` | Federated `discover()` across 4 tiers · SearXNG (surface) · Internet Archive (archive) · Prowlarr (deep) · Ahmia (dark) · coverage | ✅ built · tested · typechecked |
 | `@aivm/swarm` | Unified job-based P2P · qBittorrent (BT) + amuled (eD2k/Kad) adapters · URI routing · search-by-health | ✅ built · tested · typechecked |
-| `identify` / `profiles` / … | identification, domain profiles | 📋 designed |
+| `@aivm/identify` | Binary → text clue: ffprobe · audio fingerprint (chromaprint+AcoustID) · transcribe (whisper) · OCR (tesseract) | ✅ built · tested · typechecked |
+| `runtime` / `profiles` / … | Claude tool surface, domain profiles | 📋 designed |
 
 > Perfect Dark / Share have no control API (closed, Windows-only) — they plug in later as GUI-automation adapters behind the same `SwarmAdapter` interface.
 
