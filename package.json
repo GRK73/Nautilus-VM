@@ -1,0 +1,22 @@
+{
+  "name": "aivm-lm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent VM for Lost-Media Hunting — see VM_design.md",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "node --test --disable-warning=ExperimentalWarning packages/casefile/test/casefile.test.ts",
+    "demo:casefile": "node --disable-warning=ExperimentalWarning packages/casefile/examples/demo.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

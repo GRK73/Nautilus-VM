@@ -1,0 +1,13 @@
+{
+  "name": "@aivm/casefile",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The investigation external brain: leads, evidence, entities, dead-ends, timeline, FTS, digest.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/casefile.test.ts",
+    "demo": "node --disable-warning=ExperimentalWarning examples/demo.ts"
+  }
+}

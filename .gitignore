@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+# case file databases / artifacts (local investigation state)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+data/
+artifacts/
+.env
+.env.*
