@@ -20,6 +20,7 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 | `@aivm/profiles` | Domain profiles (jp_media / western_tv / games): source & network priority, identify defaults, agent guidance | ✅ built · tested · typechecked |
 | `@aivm/tor` | Zero-dep Tor SOCKS5 gateway — `fetch` routes `.onion` through it transparently | ✅ built · tested · typechecked |
 | `@aivm/agent` (app) | The real tool-use loop — drives the VM via the Messages API (zero-dep, over fetch) | ✅ built · tested · typechecked |
+| `@aivm/mcp` (app) | MCP server — exposes the 21 tools as a **connector** for Claude Code / Desktop / claude.ai (zero-dep stdio JSON-RPC) | ✅ built · tested · typechecked |
 | PD-Share / sandbox / … | Perfect Dark/Share GUI adapters, E2B/Docker isolation | 📋 designed |
 
 > Perfect Dark / Share have no control API (closed, Windows-only) — they plug in later as GUI-automation adapters behind the same `SwarmAdapter` interface.
@@ -55,6 +56,24 @@ ANTHROPIC_API_KEY=… npm run agent -- --profile=jp_media --workdir=./cases/jing
 # optional sources via env: SEARXNG_URL, PROWLARR_URL/PROWLARR_API_KEY,
 #                           QBITTORRENT_URL/USER/PASS, AMULE_PASSWORD, ACOUSTID_KEY
 ```
+
+## Use it as a connector (MCP)
+
+`@aivm/mcp` exposes the 21 tools over the Model Context Protocol, so any MCP client (Claude Code, Claude Desktop, claude.ai) can call them directly. Register it — for Claude Code, add a `.mcp.json` at the project root:
+
+```json
+{
+  "mcpServers": {
+    "nautilus": {
+      "command": "node",
+      "args": ["--disable-warning=ExperimentalWarning", "apps/mcp/src/stdio.ts"],
+      "env": { "NAUTILUS_WORKDIR": "./cases/mcp", "NAUTILUS_PROFILE": "" }
+    }
+  }
+}
+```
+
+The tools then appear as `mcp__nautilus__discover`, `mcp__nautilus__fetch`, `mcp__nautilus__identify_fingerprint`, … Same env switches as the agent (SEARXNG_URL, ACOUSTID_KEY, TOR_SOCKS_*, …). Heads-up: this server can fetch `.onion` and drive P2P, so enable it deliberately.
 
 ## Stack
 

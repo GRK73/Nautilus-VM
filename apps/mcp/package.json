@@ -1,0 +1,11 @@
+{
+  "name": "@aivm/mcp",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "MCP server exposing the Nautilus VM tools as a connector (Claude Code / Desktop / claude.ai). Zero-dep stdio JSON-RPC.",
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
+    "start": "node --disable-warning=ExperimentalWarning src/stdio.ts"
+  }
+}
