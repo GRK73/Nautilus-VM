@@ -1,0 +1,97 @@
+# Nautilus P2P backend stack — every daemon runs in its own isolated container.
+# This IS the sandbox/isolation layer (VM_design.md §6.1): the P2P clients,
+# Tor, and the DHT crawler stay in containers instead of on the bare host.
+#
+# Prereq: Docker Desktop.
+# Bring up:   docker compose -f deploy/docker-compose.yml up -d
+# Then point the Nautilus MCP/agent at these via env (see deploy/README.md).
+#
+# NOTE: authored from each image's documented defaults but NOT run-tested here
+# (no Docker on the dev host) — verify image tags / env names on first `up`.
+name: nautilus
+
+services:
+  # .onion fetch — exposes a SOCKS5 proxy on 9050 (Nautilus default TOR_SOCKS).
+  tor:
+    image: osminogin/tor-simple:latest
+    container_name: nautilus-tor
+    ports:
+      - "9050:9050"
+    restart: unless-stopped
+
+  # BitTorrent — WebUI on 8080 → QBITTORRENT_URL.
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: nautilus-qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Seoul
+      - WEBUI_PORT=8080
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    volumes:
+      - qbt-config:/config
+      - ./downloads:/downloads
+    restart: unless-stopped
+    # First start logs a temporary WebUI password:  docker logs nautilus-qbittorrent
+
+  # bitmagnet's database.
+  postgres:
+    image: postgres:16-alpine
+    container_name: nautilus-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=bitmagnet
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # DHT crawler + indexer — GraphQL on 3333 → BITMAGNET_URL.
+  bitmagnet:
+    image: ghcr.io/bitmagnet-io/bitmagnet:latest
+    container_name: nautilus-bitmagnet
+    ports:
+      - "3333:3333"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_NAME=bitmagnet
+    command: ["worker", "run", "--all"]
+    restart: unless-stopped
+
+  # eD2k/Kad — amuleweb on 4711, EC (External Connection) on 4712 → AMULE_*.
+  # BEST-EFFORT: confirm this image actually exposes EC with a known password so
+  # the AmuleAdapter (amulecmd over EC) can reach it; env var names vary by image.
+  amule:
+    image: ngosang/amule:latest
+    container_name: nautilus-amule
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - GUI_PWD=nautilus
+    ports:
+      - "4711:4711"
+      - "4712:4712"
+      - "4662:4662"
+      - "4672:4672/udp"
+    volumes:
+      - amule-config:/home/amule/.aMule
+      - ./downloads:/incoming
+    restart: unless-stopped
+
+volumes:
+  qbt-config:
+  pg-data:
+  amule-config:
