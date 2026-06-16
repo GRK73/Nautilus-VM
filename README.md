@@ -16,11 +16,33 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 | `@aivm/recon` | Federated `discover()` across 4 tiers · SearXNG (surface) · Internet Archive (archive) · Prowlarr (deep) · Ahmia (dark) · coverage | ✅ built · tested · typechecked |
 | `@aivm/swarm` | Unified job-based P2P · qBittorrent (BT) + amuled (eD2k/Kad) adapters · URI routing · search-by-health | ✅ built · tested · typechecked |
 | `@aivm/identify` | Binary → text clue: ffprobe · audio fingerprint (chromaprint+AcoustID) · transcribe (whisper) · OCR (tesseract) | ✅ built · tested · typechecked |
-| `runtime` / `profiles` / … | Claude tool surface, domain profiles | 📋 designed |
+| `@aivm/runtime` | **The VM surface** — wires every package into 19 tools Claude can drive (Agent SDK / Messages API `tool_use`) | ✅ built · tested · typechecked |
+| `profiles` / PD-Share / … | domain profiles, Perfect Dark/Share GUI adapters | 📋 designed |
 
 > Perfect Dark / Share have no control API (closed, Windows-only) — they plug in later as GUI-automation adapters behind the same `SwarmAdapter` interface.
 
-The packages compose into one investigation loop: **`discover()` → `fetch()`/`download()` → artifact → case-file evidence**, with content-addressed dedup and per-source coverage. See `packages/recon/examples/demo.ts` (runs end-to-end, no external services).
+The packages compose into one investigation loop: **`discover()` → `fetch()`/`download()` → artifact → identify → case-file evidence**, with content-addressed dedup and per-source coverage. `@aivm/runtime` exposes the whole thing as tools — `packages/runtime/examples/demo.ts` runs a scripted Claude-style investigation end-to-end (no external services).
+
+## Driving it from Claude
+
+```ts
+import { Nautilus } from '@aivm/runtime';
+
+const vm = new Nautilus({ caseFile, store, acquirer, downloader, recon, swarm, identifier });
+
+const response = await anthropic.messages.create({
+  model: 'claude-opus-4-8',
+  tools: vm.toAnthropicTools(),      // 19 tools: discover, fetch, p2p_*, identify_*, case_*
+  messages,
+});
+
+for (const block of response.content) {
+  if (block.type === 'tool_use') {
+    const out = await vm.call(block.name, block.input);   // { ok, result | error }
+    // append a tool_result with out.result, then continue the loop
+  }
+}
+```
 
 ## Stack
 

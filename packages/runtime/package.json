@@ -1,0 +1,13 @@
+{
+  "name": "@aivm/runtime",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The VM surface: wires all packages into a tool registry Claude can drive (Agent SDK / Messages API tool_use).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
+    "demo": "node --disable-warning=ExperimentalWarning examples/demo.ts"
+  }
+}
