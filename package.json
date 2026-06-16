@@ -12,11 +12,12 @@
   },
   "scripts": {
     "test": "node --test --disable-warning=ExperimentalWarning",
-    "typecheck": "tsc -p packages/casefile/tsconfig.json && tsc -p packages/artifacts/tsconfig.json && tsc -p packages/acquisition/tsconfig.json && tsc -p packages/recon/tsconfig.json",
+    "typecheck": "tsc -p packages/casefile/tsconfig.json && tsc -p packages/artifacts/tsconfig.json && tsc -p packages/acquisition/tsconfig.json && tsc -p packages/recon/tsconfig.json && tsc -p packages/swarm/tsconfig.json",
     "demo:casefile": "node --disable-warning=ExperimentalWarning packages/casefile/examples/demo.ts",
     "demo:artifacts": "node --disable-warning=ExperimentalWarning packages/artifacts/examples/demo.ts",
     "demo:acquisition": "node --disable-warning=ExperimentalWarning packages/acquisition/examples/demo.ts",
-    "demo:recon": "node --disable-warning=ExperimentalWarning packages/recon/examples/demo.ts"
+    "demo:recon": "node --disable-warning=ExperimentalWarning packages/recon/examples/demo.ts",
+    "demo:swarm": "node --disable-warning=ExperimentalWarning packages/swarm/examples/demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

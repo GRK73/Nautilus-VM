@@ -1,0 +1,13 @@
+{
+  "name": "@aivm/swarm",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Unified P2P layer: job-based downloads across networks. qBittorrent (BT) adapter + manager.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
+    "demo": "node --disable-warning=ExperimentalWarning examples/demo.ts"
+  }
+}

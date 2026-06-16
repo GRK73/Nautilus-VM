@@ -14,7 +14,8 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 | `@aivm/artifacts` | Content-addressed store — sha256 = id, provenance, cache, ranged reads | ✅ built · tested · typechecked |
 | `@aivm/acquisition` | `fetch` (HTML→text+summary, URL-cached) · Wayback archive · `download` (stream + yt-dlp) | ✅ built · tested · typechecked |
 | `@aivm/recon` | Federated `discover()` across 4 tiers · SearXNG (surface) · Internet Archive (archive) · Prowlarr (deep) · Ahmia (dark) · coverage | ✅ built · tested · typechecked |
-| `swarm` / `identify` / `profiles` / … | P2P, identification, domain profiles | 📋 designed |
+| `@aivm/swarm` | Unified job-based P2P · qBittorrent (BT) adapter · URI routing · search-by-health | ✅ built · tested · typechecked |
+| `identify` / `profiles` / … | identification, domain profiles | 📋 designed |
 
 The packages compose into one investigation loop: **`discover()` → `fetch()`/`download()` → artifact → case-file evidence**, with content-addressed dedup and per-source coverage. See `packages/recon/examples/demo.ts` (runs end-to-end, no external services).
 
