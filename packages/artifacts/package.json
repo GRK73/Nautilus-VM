@@ -1,0 +1,13 @@
+{
+  "name": "@aivm/artifacts",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Content-addressed artifact store: sha256 = id, provenance, cache, ranged reads.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/artifacts.test.ts",
+    "demo": "node --disable-warning=ExperimentalWarning examples/demo.ts"
+  }
+}

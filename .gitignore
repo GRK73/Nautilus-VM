@@ -1,12 +1,13 @@
 node_modules/
 dist/
 *.tsbuildinfo
-# case file databases / artifacts (local investigation state)
+# case file databases / artifacts (local investigation state).
+# NOTE: anchored to repo root so these do NOT match the packages/artifacts source.
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
 *.db
-data/
-artifacts/
+/data/
+/cases/
 .env
 .env.*
