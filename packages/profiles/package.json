@@ -1,0 +1,12 @@
+{
+  "name": "@aivm/profiles",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Domain profiles (jp_media / western_tv / games): source & network priority, identify defaults, agent guidance.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts"
+  }
+}

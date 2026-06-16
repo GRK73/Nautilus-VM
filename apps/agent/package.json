@@ -1,0 +1,11 @@
+{
+  "name": "@aivm/agent",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "description": "The Nautilus agent: a real Claude tool-use loop driving the VM. Zero deps — talks to the Messages API over fetch.",
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
+    "start": "node --disable-warning=ExperimentalWarning src/cli.ts"
+  }
+}

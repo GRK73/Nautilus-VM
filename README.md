@@ -17,7 +17,9 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 | `@aivm/swarm` | Unified job-based P2P · qBittorrent (BT) + amuled (eD2k/Kad) adapters · URI routing · search-by-health | ✅ built · tested · typechecked |
 | `@aivm/identify` | Binary → text clue: ffprobe · audio fingerprint (chromaprint+AcoustID) · transcribe (whisper) · OCR (tesseract) | ✅ built · tested · typechecked |
 | `@aivm/runtime` | **The VM surface** — wires every package into 19 tools Claude can drive (Agent SDK / Messages API `tool_use`) | ✅ built · tested · typechecked |
-| `profiles` / PD-Share / … | domain profiles, Perfect Dark/Share GUI adapters | 📋 designed |
+| `@aivm/profiles` | Domain profiles (jp_media / western_tv / games): source & network priority, identify defaults, agent guidance | ✅ built · tested · typechecked |
+| `@aivm/agent` (app) | The real tool-use loop — drives the VM via the Messages API (zero-dep, over fetch) | ✅ built · tested · typechecked |
+| PD-Share / sandbox / … | Perfect Dark/Share GUI adapters, E2B/Docker isolation | 📋 designed |
 
 > Perfect Dark / Share have no control API (closed, Windows-only) — they plug in later as GUI-automation adapters behind the same `SwarmAdapter` interface.
 
@@ -42,6 +44,15 @@ for (const block of response.content) {
     // append a tool_result with out.result, then continue the loop
   }
 }
+```
+
+…or just run the bundled agent (the loop above, over plain `fetch` — no SDK):
+
+```bash
+ANTHROPIC_API_KEY=… npm run agent -- --profile=jp_media --workdir=./cases/jingle \
+  "Find the 1995 Japanese radio jingle with a synth melody and no vocals"
+# optional sources via env: SEARXNG_URL, PROWLARR_URL/PROWLARR_API_KEY,
+#                           QBITTORRENT_URL/USER/PASS, AMULE_PASSWORD, ACOUSTID_KEY
 ```
 
 ## Stack
