@@ -1,0 +1,12 @@
+{
+  "name": "@aivm/tor",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Zero-dependency Tor SOCKS5 gateway — fetch .onion (and clearnet) through a Tor proxy.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts"
+  }
+}

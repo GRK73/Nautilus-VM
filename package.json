@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "node --test --disable-warning=ExperimentalWarning",
-    "typecheck": "tsc -p packages/casefile/tsconfig.json && tsc -p packages/artifacts/tsconfig.json && tsc -p packages/acquisition/tsconfig.json && tsc -p packages/recon/tsconfig.json && tsc -p packages/swarm/tsconfig.json && tsc -p packages/identify/tsconfig.json && tsc -p packages/runtime/tsconfig.json && tsc -p packages/profiles/tsconfig.json && tsc -p apps/agent/tsconfig.json",
+    "typecheck": "tsc -p packages/casefile/tsconfig.json && tsc -p packages/artifacts/tsconfig.json && tsc -p packages/acquisition/tsconfig.json && tsc -p packages/recon/tsconfig.json && tsc -p packages/swarm/tsconfig.json && tsc -p packages/identify/tsconfig.json && tsc -p packages/runtime/tsconfig.json && tsc -p packages/profiles/tsconfig.json && tsc -p packages/tor/tsconfig.json && tsc -p apps/agent/tsconfig.json",
     "demo:casefile": "node --disable-warning=ExperimentalWarning packages/casefile/examples/demo.ts",
     "demo:artifacts": "node --disable-warning=ExperimentalWarning packages/artifacts/examples/demo.ts",
     "demo:acquisition": "node --disable-warning=ExperimentalWarning packages/acquisition/examples/demo.ts",

@@ -6,6 +6,7 @@ import { Acquirer, Downloader } from '../../../packages/acquisition/src/index.ts
 import { Recon, SearXNGSource, InternetArchiveSource, ProwlarrSource, AhmiaSource } from '../../../packages/recon/src/index.ts';
 import { Swarm, QBittorrentAdapter, AmuleAdapter } from '../../../packages/swarm/src/index.ts';
 import { Identifier, HttpReverseImageProvider } from '../../../packages/identify/src/index.ts';
+import { TorClient } from '../../../packages/tor/src/index.ts';
 import { Nautilus } from '../../../packages/runtime/src/index.ts';
 import { getProfile, isProfileName } from '../../../packages/profiles/src/index.ts';
 import type { Profile } from '../../../packages/profiles/src/index.ts';
@@ -44,7 +45,16 @@ export function buildVM(opts: WireOptions): WiredVM {
     title: opts.title,
     profile: profile?.name ?? null,
   });
-  const acquirer = new Acquirer(store, { cachePath: join(opts.workdir, 'acquisition.sqlite') });
+  // Tor gateway: .onion fetches route through it (works when Tor is running).
+  const tor = new TorClient({ host: env.TOR_SOCKS_HOST, port: env.TOR_SOCKS_PORT ? Number(env.TOR_SOCKS_PORT) : undefined });
+  const acquirer = new Acquirer(store, {
+    cachePath: join(opts.workdir, 'acquisition.sqlite'),
+    onionFetch: async (url) => {
+      const r = await tor.fetch(url);
+      return { status: r.status, finalUrl: url, mime: (r.headers['content-type'] ?? 'application/octet-stream').split(';')[0]!.trim(), body: r.body };
+    },
+  });
+  enabled.push(`tor(${env.TOR_SOCKS_HOST ?? '127.0.0.1'}:${env.TOR_SOCKS_PORT ?? '9050'})`);
   const downloader = new Downloader(store);
 
   // recon: public sources always; configured ones on demand

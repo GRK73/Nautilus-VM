@@ -30,6 +30,9 @@ export interface FetchOptions {
   force?: boolean;
 }
 
+/** Route .onion requests through Tor. Returns the same shape as a normal fetch. */
+export type OnionFetch = (url: string, timeoutMs: number) => Promise<{ status: number; finalUrl: string; mime: string; body: Buffer }>;
+
 export interface AcquirerOptions {
   /** Where the URL cache lives. Default ':memory:'. */
   cachePath?: string;
@@ -37,6 +40,8 @@ export interface AcquirerOptions {
   timeoutMs?: number;
   /** Default cache TTL. */
   ttlMs?: number;
+  /** When set, .onion URLs are fetched through this (a Tor gateway) instead of clearnet fetch. */
+  onionFetch?: OnionFetch;
 }
 
 export interface TextOptions {

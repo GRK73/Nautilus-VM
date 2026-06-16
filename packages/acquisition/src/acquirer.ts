@@ -2,7 +2,7 @@ import { ArtifactStore } from '../../artifacts/src/index.ts';
 import type { ArtifactKind } from '../../artifacts/src/index.ts';
 import { UrlCache } from './cache.ts';
 import { extractLinks, extractMetaDescription, extractTitle, htmlToText, summarize } from './html.ts';
-import type { AcquirerOptions, FetchOptions, FetchResult, TextOptions, WaybackSnapshot } from './types.ts';
+import type { AcquirerOptions, FetchOptions, FetchResult, OnionFetch, TextOptions, WaybackSnapshot } from './types.ts';
 
 const DEFAULT_UA = 'Mozilla/5.0 (compatible; NautilusVM/0.1; lost-media-archival)';
 const DEFAULT_TIMEOUT = 20_000;
@@ -51,6 +51,7 @@ export class Acquirer {
   #ua: string;
   #timeout: number;
   #ttl: number;
+  #onionFetch: OnionFetch | undefined;
 
   constructor(store: ArtifactStore, opts: AcquirerOptions = {}) {
     this.#store = store;
@@ -58,6 +59,7 @@ export class Acquirer {
     this.#ua = opts.userAgent ?? DEFAULT_UA;
     this.#timeout = opts.timeoutMs ?? DEFAULT_TIMEOUT;
     this.#ttl = opts.ttlMs ?? DEFAULT_TTL;
+    this.#onionFetch = opts.onionFetch;
   }
 
   get store(): ArtifactStore {
@@ -196,6 +198,13 @@ export class Acquirer {
   }
 
   async #httpGet(url: string, timeoutMs: number): Promise<HttpResponse> {
+    const host = new URL(url).hostname;
+    if (host.endsWith('.onion')) {
+      if (!this.#onionFetch) {
+        throw new Error(`'.onion' requires Tor. Configure a Tor gateway (default SOCKS 127.0.0.1:9050) so fetch can route through it.`);
+      }
+      return this.#onionFetch(url, timeoutMs);
+    }
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     let res: Response;

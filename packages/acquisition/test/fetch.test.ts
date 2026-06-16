@@ -101,6 +101,38 @@ test('text() returns cleaned body without script/markup', async () => {
   }
 });
 
+test('.onion URLs route through the Tor gateway; without one they error', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aivm_onion_'));
+  const store = new ArtifactStore(dir);
+  const onion = 'http://abcdeflostmedia2222222222222222222222222222222222222222.onion/';
+
+  // no gateway → actionable error
+  const plain = new Acquirer(store, { cachePath: ':memory:' });
+  await assert.rejects(() => plain.fetch(onion), /\.onion.*requires Tor/s);
+  plain.close();
+
+  // with a stub gateway → captured like any page
+  let routed = '';
+  const acq = new Acquirer(store, {
+    cachePath: ':memory:',
+    onionFetch: async (url) => {
+      routed = url;
+      return { status: 200, finalUrl: url, mime: 'text/html', body: Buffer.from('<html><title>Onion Mirror</title>rare tape</html>') };
+    },
+  });
+  try {
+    const r = await acq.fetch(onion);
+    assert.equal(routed, onion);
+    assert.equal(r.status, 200);
+    assert.equal(r.title, 'Onion Mirror');
+    assert.match(acq.text(r.artifactId), /rare tape/);
+  } finally {
+    acq.close();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('non-html content is captured as text', async () => {
   const h = await harness();
   try {

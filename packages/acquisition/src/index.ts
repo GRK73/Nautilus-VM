@@ -14,6 +14,7 @@ export type {
   FetchResult,
   FetchOptions,
   AcquirerOptions,
+  OnionFetch,
   TextOptions,
   WaybackSnapshot,
 } from './types.ts';

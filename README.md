@@ -18,6 +18,7 @@ An **agent VM for lost-media hunting** — a sandboxed workspace designed so an 
 | `@aivm/identify` | Binary → text clue: ffprobe · audio fingerprint (chromaprint+AcoustID) · transcribe (whisper) · OCR (tesseract) | ✅ built · tested · typechecked |
 | `@aivm/runtime` | **The VM surface** — wires every package into 19 tools Claude can drive (Agent SDK / Messages API `tool_use`) | ✅ built · tested · typechecked |
 | `@aivm/profiles` | Domain profiles (jp_media / western_tv / games): source & network priority, identify defaults, agent guidance | ✅ built · tested · typechecked |
+| `@aivm/tor` | Zero-dep Tor SOCKS5 gateway — `fetch` routes `.onion` through it transparently | ✅ built · tested · typechecked |
 | `@aivm/agent` (app) | The real tool-use loop — drives the VM via the Messages API (zero-dep, over fetch) | ✅ built · tested · typechecked |
 | PD-Share / sandbox / … | Perfect Dark/Share GUI adapters, E2B/Docker isolation | 📋 designed |
 
