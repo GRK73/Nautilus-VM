@@ -1,65 +1,136 @@
 # Nautilus-VM
 
-An **agent VM for lost-media hunting** — a sandboxed workspace designed so an LLM agent (Claude) can investigate hard-to-find media end-to-end: searching the open internet, web archives, the deep web, the dark web, and **every P2P/torrent network** (BitTorrent, eD2k/Kad, Perfect Dark, Share).
+**An agent VM for lost-media hunting.** A sandboxed workspace that lets an LLM agent (Claude) track down hard-to-find media end-to-end — across the open web, web archives, the deep web, the dark web (`.onion`), and the P2P/torrent networks (BitTorrent, eD2k/Kad) — while *remembering the whole investigation* so a multi-day hunt survives across sessions.
 
-> Design philosophy: **"the VM remembers, the agent only decides."** The VM is the agent's external brain.
+> **Design philosophy: "the VM remembers, the agent only decides."**
+> The VM is the agent's external brain and toolbelt. The model spends its context on judgment; everything bulky or stateful lives in the VM.
 
-📐 Full architecture: **[VM_design.md](VM_design.md)** (13 sections — layers, recon, domain profiles, OSS mapping, roadmap).
+📐 Full architecture & rationale: **[VM_design.md](VM_design.md)** (layers · recon · domain profiles · OSS mapping · roadmap).
 
-## Status
+---
 
-| Package | What | State |
-|---|---|---|
-| `@aivm/casefile` | Investigation external brain — leads, evidence, entities, dead-ends, timeline, FTS, digest | ✅ built · tested · typechecked |
-| `@aivm/artifacts` | Content-addressed store — sha256 = id, provenance, cache, ranged reads | ✅ built · tested · typechecked |
-| `@aivm/acquisition` | `fetch` (HTML→text+summary, URL-cached) · Wayback archive · `download` (stream + yt-dlp) | ✅ built · tested · typechecked |
-| `@aivm/recon` | Federated `discover()` across 4 tiers · SearXNG (surface) · Internet Archive (archive) · Prowlarr + **bitmagnet DHT** (deep) · Ahmia (dark) · coverage | ✅ built · tested · typechecked |
-| `@aivm/swarm` | Unified job-based P2P · qBittorrent (BT) + amuled (eD2k/Kad) adapters · URI routing · search-by-health | ✅ built · tested · typechecked |
-| `@aivm/identify` | Binary → text clue: ffprobe · audio fingerprint (chromaprint+AcoustID) · transcribe (whisper) · OCR (tesseract) | ✅ built · tested · typechecked |
-| `@aivm/runtime` | **The VM surface** — wires every package into 19 tools Claude can drive (Agent SDK / Messages API `tool_use`) | ✅ built · tested · typechecked |
-| `@aivm/profiles` | Domain profiles (jp_media / western_tv / games): source & network priority, identify defaults, agent guidance | ✅ built · tested · typechecked |
-| `@aivm/tor` | Zero-dep Tor SOCKS5 gateway — `fetch` routes `.onion` through it transparently | ✅ built · tested · typechecked |
-| `@aivm/agent` (app) | The real tool-use loop — drives the VM via the Messages API (zero-dep, over fetch) | ✅ built · tested · typechecked |
-| `@aivm/mcp` (app) | MCP server — exposes the 21 tools as a **connector** for Claude Code / Desktop / claude.ai (zero-dep stdio JSON-RPC) | ✅ built · tested · typechecked |
-| PD-Share / sandbox / … | Perfect Dark/Share GUI adapters, E2B/Docker isolation | 📋 designed |
+## Why it exists
 
-> Perfect Dark / Share have no control API (closed, Windows-only) — they plug in later as GUI-automation adapters behind the same `SwarmAdapter` interface.
+"Lost media" is rarely *gone* — it's mislabeled, foreign-language-indexed, sitting on an obscure filelocker, buried in an archive, or living at an unlinked URL. Finding it means grinding through many layers (search craft → archives → file/P2P indexes → catalogs → communities), identifying fragments (an unknown song, a stray clip), and keeping track of dozens of leads and dead-ends over a long hunt.
 
-The packages compose into one investigation loop: **`discover()` → `fetch()`/`download()` → artifact → identify → case-file evidence**, with content-addressed dedup and per-source coverage. `@aivm/runtime` exposes the whole thing as tools — `packages/runtime/examples/demo.ts` runs a scripted Claude-style investigation end-to-end (no external services).
+An LLM doing this alone hits four walls: it **forgets** across context windows, its context **overflows** if you paste raw pages/binaries into it, it **can't hold binaries** (audio/video/images) to identify them, and it **re-does work** it already tried. Nautilus removes all four by giving the model a VM that is the durable, parallel substrate for the hunt.
+
+---
+
+## How it works — one investigation loop
+
+```
+                  ┌──────────────────────────────────────────────┐
+   Claude  ◄────►  │  21 tools  (case_* · discover · fetch · p2p_* │
+ (decides)         │            identify_* · download · …)         │
+                  └───────────────┬──────────────────────────────┘
+                                  │
+   discover ──► fetch / download ──► artifact (sha256 + summary) ──► identify ──► case-file evidence
+   (surface/archive/                (reference, not payload)        (binary→text)   (the external brain:
+    deep/dark, P2P)                                                                  leads, dead-ends, timeline)
+```
+
+Everything bulky (a web page, a torrent, a video) is stored **once**, content-addressed by `sha256`, and surfaced to the model as `{ id, summary }`. The agent reasons over references and only pulls bytes when it needs them. Findings, hypotheses, and dead-ends are recorded in a **case file** (SQLite + full-text search) so any session can resume cold with one `case_digest` call.
+
+`packages/runtime/examples/demo.ts` runs a scripted, Claude-style investigation through this whole loop end-to-end with **no external services** — a good place to see it move.
+
+---
+
+## The 21 tools
+
+| Group | Tools |
+|---|---|
+| **Memory** (the external brain) | `case_digest` (resume — call first) · `case_report` · `case_lead_add` · `case_lead_update` · `case_evidence_attach` · `case_deadend` (auto-marks the lead dead) · `case_search` (FTS) |
+| **Find** | `discover(query, scope)` — fans across **surface / archive / deep / dark** at once, returns unified candidates + per-source coverage · `fetch(url)` (cached; `.onion` routes through Tor) · `archive_lookup(url)` (Wayback) · `read_artifact(id)` (ranged drill-down) |
+| **Acquire** | `download(url)` (HTTP stream / yt-dlp) · `p2p_search` (seeders + health) · `p2p_download` (magnet/ed2k → async job) · `p2p_jobs` |
+| **Identify** (binary → text clue) | `identify_fingerprint` (chromaprint + AcoustID — *lostwave*) · `identify_transcribe` (whisper) · `identify_ocr` (tesseract) · `identify_probe` (ffprobe) · `identify_frames` (video → keyframes) · `image_reverse` |
+
+---
+
+## Packages
+
+A TypeScript monorepo — **9 packages + 2 apps**, **91 tests** passing.
+
+| Module | What |
+|---|---|
+| `@aivm/casefile` | The investigation external brain — leads, evidence, entities, dead-ends, timeline, FTS, digest/report. `node:sqlite` + FTS5, **zero runtime deps**. |
+| `@aivm/artifacts` | Content-addressed store — `sha256` = id, provenance, dedup/cache, ranged reads, streaming ingest for big files. |
+| `@aivm/acquisition` | `fetch` (HTML → text + summary + links, URL-cached) · Wayback `archive_lookup/get` · `download` (stream / yt-dlp). Zero-dep HTML processing. |
+| `@aivm/recon` | Federated `discover()` across 4 tiers: SearXNG (surface) · Internet Archive (archive) · Prowlarr + **bitmagnet DHT** (deep) · Ahmia (dark). Pluggable `Source` interface + coverage. |
+| `@aivm/swarm` | Unified job-based P2P — qBittorrent (BT) + amuled (eD2k/Kad) adapters, URI routing (magnet→bt, ed2k→ed2k), search-by-health. |
+| `@aivm/identify` | Binary → text clue: ffprobe, audio fingerprint, transcribe, OCR, video keyframes, reverse image. Injectable tool runner → testable with no binaries. |
+| `@aivm/tor` | Zero-dependency Tor SOCKS5 gateway (hand-rolled SOCKS5 + TLS + HTTP/chunked). `fetch` routes `.onion` through it transparently. |
+| `@aivm/profiles` | Domain profiles (`jp_media` / `western_tv` / `games`): source & network priority, identify defaults, agent guidance. |
+| `@aivm/runtime` | **The VM surface** — wires every package into the 21 tools and dispatches calls. `toAnthropicTools()` + `call()`. |
+| `@aivm/agent` (app) | The real Claude tool-use loop, over plain `fetch` to the Messages API (no SDK). |
+| `@aivm/mcp` (app) | MCP server — exposes the tools as a **connector** for Claude Code / Desktop / claude.ai (zero-dep stdio JSON-RPC). |
+
+> **Perfect Dark / Share** (Japanese, closed, Windows-only, no control API) are *designed* to plug in behind the same `SwarmAdapter` interface as GUI-automation adapters — not yet built.
+
+---
+
+## Stack & design choices
+
+- **TypeScript / Node 24**, run directly via native type-stripping — **no build step**; `tsc` only typechecks. Source files import siblings with explicit `.ts` extensions.
+- **`node:sqlite` + FTS5** — the casefile/artifacts cores have **zero runtime dependencies**. (Network sources and tools are reached over `fetch` / child processes; heavyweight daemons run in containers — see below.)
+- npm workspaces monorepo. Cross-package imports use relative paths.
+
+## Quick start
+
+```bash
+npm install            # dev deps only (typescript, @types/node)
+npm test               # 91 tests, all packages (node --test auto-discovers)
+npm run typecheck      # tsc, per package
+
+# self-contained demos (no external services / API key)
+npm run demo:runtime     # a scripted Claude-style investigation through all 21 tools
+npm run demo:casefile    # the external-brain mechanics (lostwave)
+npm run demo:identify    # mystery clip → probe/fingerprint/transcribe → evidence
+npm run demo:recon       # discover → fetch → artifact → case-file evidence
+npm run demo:swarm       # P2P: search by health → async download → poll
+```
+
+---
 
 ## Driving it from Claude
+
+### Programmatically
 
 ```ts
 import { Nautilus } from '@aivm/runtime';
 
 const vm = new Nautilus({ caseFile, store, acquirer, downloader, recon, swarm, identifier });
 
-const response = await anthropic.messages.create({
+const res = await anthropic.messages.create({
   model: 'claude-opus-4-8',
-  tools: vm.toAnthropicTools(),      // 19 tools: discover, fetch, p2p_*, identify_*, case_*
+  tools: vm.toAnthropicTools(),          // the 21 tool definitions
   messages,
 });
 
-for (const block of response.content) {
+for (const block of res.content) {
   if (block.type === 'tool_use') {
-    const out = await vm.call(block.name, block.input);   // { ok, result | error }
+    const out = await vm.call(block.name, block.input);   // { ok, result | error } — never throws
     // append a tool_result with out.result, then continue the loop
   }
 }
 ```
 
-…or just run the bundled agent (the loop above, over plain `fetch` — no SDK):
+### The bundled agent (no SDK — plain `fetch` to the Messages API)
 
 ```bash
 ANTHROPIC_API_KEY=… npm run agent -- --profile=jp_media --workdir=./cases/jingle \
   "Find the 1995 Japanese radio jingle with a synth melody and no vocals"
-# optional sources via env: SEARXNG_URL, PROWLARR_URL/PROWLARR_API_KEY, BITMAGNET_URL,
-#                           QBITTORRENT_URL/USER/PASS, AMULE_PASSWORD, ACOUSTID_KEY
 ```
+
+Works with just an API key + internet (Internet Archive, Ahmia listing, `fetch`/`archive`/`download` are always on). Optional sources switch on via env — see the table below.
+
+---
 
 ## Use it as a connector (MCP)
 
-`@aivm/mcp` exposes the 21 tools over the Model Context Protocol, so any MCP client (Claude Code, Claude Desktop, claude.ai) can call them directly. Register it — for Claude Code, add a `.mcp.json` at the project root:
+`@aivm/mcp` exposes the tools over the Model Context Protocol, so any MCP client can call them as `mcp__nautilus__discover`, `mcp__nautilus__identify_fingerprint`, etc.
+
+**Claude Code** — add `.mcp.json` at the project root:
 
 ```json
 {
@@ -73,38 +144,65 @@ ANTHROPIC_API_KEY=… npm run agent -- --profile=jp_media --workdir=./cases/jing
 }
 ```
 
-The tools then appear as `mcp__nautilus__discover`, `mcp__nautilus__fetch`, `mcp__nautilus__identify_fingerprint`, … Same env switches as the agent (SEARXNG_URL, ACOUSTID_KEY, TOR_SOCKS_*, …). Heads-up: this server can fetch `.onion` and drive P2P, so enable it deliberately.
+**Claude Desktop** — add the same `mcpServers` block to `claude_desktop_config.json`, but with **absolute paths** (Desktop launches the server from a different cwd) and the full path to `node`. Fully quit and reopen Desktop to load it.
 
-## Stack
+> ⚠️ This server can fetch `.onion` and drive P2P downloads — enable it deliberately.
 
-- **TypeScript / Node 24** — run directly via native type-stripping (no build step; `tsc` typechecks only).
-- **`node:sqlite` + FTS5** — the casefile core has **zero runtime dependencies**.
-- npm workspaces monorepo under `packages/`.
+### Optional source/backend env
 
-## Quick start
+| Env | Enables |
+|---|---|
+| `SEARXNG_URL` | Surface meta-search (70+ engines) |
+| `PROWLARR_URL` + `PROWLARR_API_KEY` | Deep: torrent + Usenet indexers |
+| `BITMAGNET_URL` | Deep: bitmagnet BitTorrent DHT crawler (GraphQL) |
+| `QBITTORRENT_URL` (+ `_USER` / `_PASS`) | BitTorrent downloads |
+| `AMULE_PASSWORD` (+ `AMULE_HOST`, `AMULE_DOCKER_CONTAINER`) | eD2k/Kad via amuled |
+| `ACOUSTID_KEY` | Audio fingerprint lookups (lostwave) |
+| `REVERSE_IMAGE_URL` | Reverse image search backend |
+| `TOR_SOCKS_HOST` / `TOR_SOCKS_PORT` | Tor gateway for `.onion` (default `127.0.0.1:9050`) |
+
+---
+
+## P2P backends in isolated containers
+
+The daemons (Tor, qBittorrent, amuled, bitmagnet) are heavy and join monitored networks — so they run in **Docker containers**, not on the bare host. This *is* the sandbox/isolation layer: the swarms and any downloaded bytes stay in containers; Nautilus stays on the host and connects over `localhost` ports.
 
 ```bash
-npm install            # dev deps only (typescript, @types/node)
-npm test               # run the casefile test suite
-npm run demo:casefile  # lostwave investigation demo (external-brain mechanics)
-npm run typecheck      # tsc
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
-## The Case File API
+Brings up `tor:9050`, `qbittorrent:8080`, `bitmagnet:3333` (+ postgres), and `amule:4712`. Then point the agent/MCP env at them (see [deploy/README.md](deploy/README.md) for the exact env block, the qBittorrent first-run password, and verification). Requires Docker Desktop.
 
-```ts
-import { CaseFile } from '@aivm/casefile';
+---
 
-const cf = new CaseFile('case.sqlite', { title: 'Unknown 1995 radio melody', profile: 'jp_media' });
+## Domain profiles
 
-const lead = cf.addLead({ hypothesis: 'CM jingle, not a released single', confidence: 0.4 });
-cf.attachEvidence({ leadId: lead.id, artifactId: 'sha256:9f1c…', source: 'acoustid.org',
-                    note: 'weak partial match', provenance: { method: 'audio.fingerprint' } });
-cf.updateLead(lead.id, { status: 'hot', confidence: 0.65 });
-cf.addDeadend({ leadId: otherId, reason: 'no tempo/key match' }); // auto-marks the lead dead
+Set `--profile` (agent) or `NAUTILUS_PROFILE` (MCP) at the start of a hunt to auto-tune source priority, P2P network order, identify defaults, and search guidance:
 
-console.log(cf.toMarkdown());  // compact digest — read this to resume an investigation cold
-console.log(cf.report());      // full synthesis
+| Profile | Leans on | Identify | Watchword |
+|---|---|---|---|
+| `jp_media` | Perfect Dark/Share/Nyaa, 5ch/Niconico | `ja` / `jpn` | search in Japanese |
+| `western_tv` | Lost Media Wiki, private trackers, Internet Archive | `en` / `eng` | confirm it existed first |
+| `games` | No-Intro/Redump DATs, Hidden Palace/TCRF | `eng` | a dump is real only if its checksum matches a DAT |
+
+---
+
+## Honest limits
+
+- **Perfect Dark / Share** have no control API; they remain GUI-automation adapters to be built later.
+- **Dark web** is reachable (Tor) but low-yield for genuine lost media — "it's only on the dark web" is a classic hoax tell, not a lead.
+- **External tools degrade gracefully** — if a binary/daemon/service isn't present, the tool returns a structured error telling you what to install (or to drop to `vm.exec`), rather than failing silently.
+- A hard line is enforced: genuinely illegal content (e.g. CSAM) is aborted and purged, never stored or indexed. This is dual-use preservation tooling; copyright/jurisdiction is the operator's responsibility, which is why every acquisition is logged with provenance.
+
+---
+
+## Repo layout
+
+```
+packages/   casefile · artifacts · acquisition · recon · swarm · identify · tor · profiles · runtime
+apps/       agent (tool-use loop) · mcp (connector)
+deploy/     docker-compose.yml — the P2P backend stack
+VM_design.md   full architecture
 ```
 
 ## License
