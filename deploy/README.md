@@ -60,11 +60,19 @@ container exposes.)
 
 ## Caveats
 
-- **Not run-tested here** (no Docker on the dev host). Image tags, the bitmagnet
-  `worker run` flags, and the aMule image's EC/password env vars are from each
-  project's docs — verify on first `up` and adjust if a service won't start.
-- **aMule** is best-effort: confirm the chosen image actually enables EC on 4712
-  with a known password, or swap to one that does.
+- **Verified running on Docker Desktop / Windows (WSL2):** all five containers
+  come up; qBittorrent WebUI, bitmagnet GraphQL, Tor SOCKS, and aMule EC (Kad
+  connected) are all reachable and drive the Nautilus adapters.
+- **bitmagnet DHT crawling barely works on Docker Desktop / Windows.** The
+  crawler depends on receiving inbound UDP from arbitrary DHT peers, and Docker
+  Desktop's WSL2 NAT doesn't reliably forward that — so `torrentContent` may
+  stay at 0 here even though the worker is healthy. It crawls normally on a
+  **Linux host** (or with proper UDP forwarding / a public IP). On Windows,
+  prefer **Prowlarr** (`PROWLARR_URL`, indexer-based, plain HTTP) for torrent
+  search; keep bitmagnet for a Linux deployment.
+- **qBittorrent** first start prints a temporary WebUI password in its logs; set
+  a fixed one (login → Tools/WebUI password, or via the API) so it survives
+  restarts, and use that in `QBITTORRENT_PASS`.
 - This is monitored-network territory (eD2k/BT). Containers isolate the host
   filesystem/process space, **not** your network identity — route egress through
   a VPN if that matters to you.

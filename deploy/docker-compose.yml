@@ -61,6 +61,11 @@ services:
     container_name: nautilus-bitmagnet
     ports:
       - "3333:3333"
+      - "3334:3334/udp"   # DHT
+    # Docker's embedded DNS may fail to resolve the DHT bootstrap nodes; pin public resolvers.
+    dns:
+      - "1.1.1.1"
+      - "8.8.8.8"
     depends_on:
       postgres:
         condition: service_healthy
