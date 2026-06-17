@@ -20,6 +20,40 @@ export interface Tool {
   handler: (args: Record<string, any>) => Promise<unknown>;
 }
 
+/** Result of opening/resuming a case via {@link CaseManager}. */
+export interface CaseOpenResult {
+  /** true if a case folder for this topic already existed and was resumed. */
+  reused: boolean;
+  /** slug used as the folder name. */
+  slug: string;
+  /** the case title (the topic the folder was first opened with). */
+  title: string;
+  /** absolute path of the case folder. */
+  path: string;
+  /** the freshly-active case's digest (so open doubles as resume). */
+  digest: string;
+}
+
+/** One existing case folder, for {@link CaseManager.list}. */
+export interface CaseInfo {
+  slug: string;
+  title: string;
+  leads: number;
+  updatedAt?: string;
+  active: boolean;
+}
+
+/**
+ * Switches the active investigation between per-topic folders. When present on
+ * the {@link ToolContext}, the runtime exposes `case_open` / `case_list` so the
+ * agent keeps separate hunts in separate folders (same topic → same folder).
+ * Implementations mutate the case-bound fields of the shared ToolContext.
+ */
+export interface CaseManager {
+  open(topic: string): CaseOpenResult;
+  list(): CaseInfo[];
+}
+
 /** The wired-up VM components a tool handler operates on. */
 export interface ToolContext {
   caseFile: CaseFile;
@@ -29,6 +63,8 @@ export interface ToolContext {
   recon: Recon;
   swarm: Swarm;
   identifier: Identifier;
+  /** Optional: when set, `case_open`/`case_list` tools are exposed. */
+  caseManager?: CaseManager;
 }
 
 /** Structured outcome of a dispatched tool call. */

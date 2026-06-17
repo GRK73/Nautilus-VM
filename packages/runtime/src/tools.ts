@@ -16,10 +16,29 @@ const num = (description: string) => ({ type: 'number', description });
  */
 export function buildTools(ctx: ToolContext): Tool[] {
   return [
+    // ---- case selection: keep separate hunts in separate folders ----
+    ...(ctx.caseManager
+      ? [
+          {
+            name: 'case_open',
+            description:
+              'Open (or resume) the case for a topic. Call this FIRST, before case_digest — it picks the folder this investigation lives in so you never mix it with other hunts. The SAME topic reuses its existing folder (and its memory); a new topic starts a fresh isolated one. Returns { reused, slug, digest } — open doubles as resume.',
+            inputSchema: obj({ topic: str('a short, stable description of what you are hunting — used to name and match the case folder') }, ['topic']),
+            handler: async (a: Record<string, any>) => ctx.caseManager!.open(a.topic),
+          },
+          {
+            name: 'case_list',
+            description: 'List existing cases (folders) with their titles, lead counts, and which one is active — so you can resume the right hunt instead of starting a duplicate.',
+            inputSchema: obj({}),
+            handler: async () => ctx.caseManager!.list(),
+          },
+        ]
+      : []),
+
     // ---- case file: the external brain ----
     {
       name: 'case_digest',
-      description: 'Resume the investigation: compact markdown of leads, recent activity, stats. Read this first.',
+      description: 'Resume the active investigation: compact markdown of leads, recent activity, stats. Read this right after case_open.',
       inputSchema: obj({}),
       handler: async () => ctx.caseFile.toMarkdown(),
     },

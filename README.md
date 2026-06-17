@@ -21,8 +21,8 @@ An LLM doing this alone hits four walls: it **forgets** across context windows, 
 
 ```
                   ┌──────────────────────────────────────────────┐
-   Claude  ◄────►  │  21 tools  (case_* · discover · fetch · p2p_* │
- (decides)         │            identify_* · download · …)         │
+   Claude  ◄────►  │  tools  (case_open · case_* · discover · fetch │
+ (decides)         │          p2p_* · identify_* · download · …)    │
                   └───────────────┬──────────────────────────────┘
                                   │
    discover ──► fetch / download ──► artifact (sha256 + summary) ──► identify ──► case-file evidence
@@ -32,15 +32,19 @@ An LLM doing this alone hits four walls: it **forgets** across context windows, 
 
 Everything bulky (a web page, a torrent, a video) is stored **once**, content-addressed by `sha256`, and surfaced to the model as `{ id, summary }`. The agent reasons over references and only pulls bytes when it needs them. Findings, hypotheses, and dead-ends are recorded in a **case file** (SQLite + full-text search) so any session can resume cold with one `case_digest` call.
 
+**One folder per investigation.** Each hunt lives in its own subfolder (its own case DB + artifacts), so separate investigations never read each other's leads. The agent calls `case_open(topic)` first: the **same topic reuses its folder** (and resumes its memory), a **new topic starts a fresh isolated one**. `case_list` shows the existing cases.
+
 `packages/runtime/examples/demo.ts` runs a scripted, Claude-style investigation through this whole loop end-to-end with **no external services** — a good place to see it move.
 
 ---
 
-## The 21 tools
+## The tools
+
+21 core tools, plus `case_open` / `case_list` added by the agent/MCP wiring (per-case folders — see below) for **23** in normal use.
 
 | Group | Tools |
 |---|---|
-| **Memory** (the external brain) | `case_digest` (resume — call first) · `case_report` · `case_lead_add` · `case_lead_update` · `case_evidence_attach` · `case_deadend` (auto-marks the lead dead) · `case_search` (FTS) |
+| **Memory** (the external brain) | `case_open` (pick/resume this hunt's folder — call first) · `case_list` (existing cases) · `case_digest` (resume) · `case_report` · `case_lead_add` · `case_lead_update` · `case_evidence_attach` · `case_deadend` (auto-marks the lead dead) · `case_search` (FTS) |
 | **Find** | `discover(query, scope)` — fans across **surface / archive / deep / dark** at once, returns unified candidates + per-source coverage · `fetch(url)` (cached; `.onion` routes through Tor) · `archive_lookup(url)` (Wayback) · `read_artifact(id)` (ranged drill-down) |
 | **Acquire** | `download(url)` (HTTP stream / yt-dlp) · `p2p_search` (seeders + health) · `p2p_download` (magnet/ed2k → async job) · `p2p_jobs` |
 | **Identify** (binary → text clue) | `identify_fingerprint` (chromaprint + AcoustID — *lostwave*) · `identify_transcribe` (whisper) · `identify_ocr` (tesseract) · `identify_probe` (ffprobe) · `identify_frames` (video → keyframes) · `image_reverse` |
@@ -61,7 +65,7 @@ A TypeScript monorepo — **9 packages + 2 apps**, **91 tests** passing.
 | `@aivm/identify` | Binary → text clue: ffprobe, audio fingerprint, transcribe, OCR, video keyframes, reverse image. Injectable tool runner → testable with no binaries. |
 | `@aivm/tor` | Zero-dependency Tor SOCKS5 gateway (hand-rolled SOCKS5 + TLS + HTTP/chunked). `fetch` routes `.onion` through it transparently. |
 | `@aivm/profiles` | Domain profiles (`jp_media` / `western_tv` / `games`): source & network priority, identify defaults, agent guidance. |
-| `@aivm/runtime` | **The VM surface** — wires every package into the 21 tools and dispatches calls. `toAnthropicTools()` + `call()`. |
+| `@aivm/runtime` | **The VM surface** — wires every package into the tool surface and dispatches calls. `toAnthropicTools()` + `call()`. |
 | `@aivm/agent` (app) | The real Claude tool-use loop, over plain `fetch` to the Messages API (no SDK). |
 | `@aivm/mcp` (app) | MCP server — exposes the tools as a **connector** for Claude Code / Desktop / claude.ai (zero-dep stdio JSON-RPC). |
 
@@ -83,7 +87,7 @@ npm test               # 91 tests, all packages (node --test auto-discovers)
 npm run typecheck      # tsc, per package
 
 # self-contained demos (no external services / API key)
-npm run demo:runtime     # a scripted Claude-style investigation through all 21 tools
+npm run demo:runtime     # a scripted Claude-style investigation through the core tools
 npm run demo:casefile    # the external-brain mechanics (lostwave)
 npm run demo:identify    # mystery clip → probe/fingerprint/transcribe → evidence
 npm run demo:recon       # discover → fetch → artifact → case-file evidence
@@ -103,7 +107,7 @@ const vm = new Nautilus({ caseFile, store, acquirer, downloader, recon, swarm, i
 
 const res = await anthropic.messages.create({
   model: 'claude-opus-4-8',
-  tools: vm.toAnthropicTools(),          // the 21 tool definitions
+  tools: vm.toAnthropicTools(),          // the tool definitions
   messages,
 });
 

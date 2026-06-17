@@ -13,11 +13,11 @@ This methodology has been **operationalized as a real tool-driven VM**: the Naut
 
 **Core principle: the VM is your memory. You only decide.** It holds the case file (leads, evidence, dead-ends, timeline), a content-addressed artifact store (everything big is a hash id + summary — never paste raw pages/binaries into context), and the acquisition/identify machinery. Reason over references, pull bytes only when needed.
 
-**The 21 tools, grouped (full surface + how to launch in `references/nautilus-vm.md`):**
+**The tools, grouped (full surface + how to launch in `references/nautilus-vm.md`):**
 
 | Layer | Tools |
 |---|---|
-| **Memory** | `case_digest` (resume — call FIRST), `case_lead_add/update`, `case_evidence_attach`, `case_deadend`, `case_search`, `case_report` |
+| **Memory** | `case_open(topic)` (pick/resume this hunt's folder — call FIRST), `case_list`, `case_digest` (resume), `case_lead_add/update`, `case_evidence_attach`, `case_deadend`, `case_search`, `case_report` |
 | **Find** | `discover(query, scope)` — fans across **surface · archive · deep · dark** at once, returns unified candidates + coverage; `fetch(url)`, `archive_lookup(url)`, `read_artifact(id)` |
 | **Acquire** | `download(url)` (HTTP stream / yt-dlp); `p2p_search`, `p2p_download` (magnet/ed2k → async job), `p2p_jobs` — covers BitTorrent + eD2k/Kad |
 | **Identify** | `identify_fingerprint` (lostwave), `identify_transcribe`, `identify_ocr`, `identify_probe`, `identify_frames` (video→keyframes), `image_reverse` |
@@ -33,7 +33,7 @@ If these tools are present, **use them as the spine of every step below**. If th
 
 ## Step 1 — Triage the target
 
-Before searching, pin down what you're hunting and how lost it is. **Open/resume the case first: call `case_digest`** (if a case exists you continue it; otherwise start one and record the target as the first lead).
+Before searching, pin down what you're hunting and how lost it is. **Open the case first: call `case_open(topic)`** with a short description of the target — the same topic resumes its own folder, a new topic starts a fresh isolated one (so hunts never mix). Then `case_digest` to see what's already there, and record the target as the first lead.
 
 1. **Medium**: film / TV / music / game / web video / commercial / image / radio / print. This decides which toolkit dominates **and which domain profile to set** — `jp_media`, `western_tv`, or `games` (see `references/nautilus-vm.md`). The profile auto-tunes source priority, P2P network order, identify defaults, and search language. Japanese material → `jp_media` (prefers Perfect Dark/Share/Nyaa, searches in Japanese); Western TV/film → `western_tv` (confirm-existence-first, private trackers + Internet Archive); games → `games` (No-Intro/Redump DAT verification, Hidden Palace/TCRF).
 2. **Every identifying detail**: exact title (and alternate/foreign titles), creator/studio/network, country, year, where it was originally seen/aired, the format it lived on. Record each as a case entity/lead.

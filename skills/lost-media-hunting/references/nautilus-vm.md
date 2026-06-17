@@ -4,10 +4,14 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 
 **Design philosophy: "the VM remembers, the agent only decides."** Big things (web pages, media, P2P files) are stored once, content-addressed by sha256, and surfaced as `{ id, summary }` — never paste raw payloads into context; pull bytes with `read_artifact` / `identify_*` only when needed.
 
-## The 21 tools
+## The tools
+
+21 core tools + `case_open`/`case_list` (added by the agent/MCP wiring) = 23 in normal use.
 
 ### Memory — the case file (external brain)
-- `case_digest` → compact markdown of leads, recent activity, stats. **Call this first to resume an investigation cold.**
+- `case_open {topic}` → pick the folder this investigation lives in. **Call this FIRST.** The SAME topic reuses its existing folder (and resumes its memory); a NEW topic starts a fresh, isolated case — so separate hunts never read each other's leads. Returns `{ reused, slug, digest }`.
+- `case_list` → existing cases (slug, title, lead count, which is active) so you resume the right one instead of starting a duplicate.
+- `case_digest` → compact markdown of leads, recent activity, stats. **Call this right after `case_open` to resume.**
 - `case_report` → full synthesis: confirmed findings, active leads with evidence, dead-ends.
 - `case_lead_add {hypothesis, status?, confidence?, source?}` — track a hypothesis (`open|hot|dead|confirmed`).
 - `case_lead_update {id, status?, confidence?}` — promote/demote as evidence accrues.
