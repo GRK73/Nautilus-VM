@@ -202,8 +202,11 @@ Set `--profile` (agent) or `NAUTILUS_PROFILE` (MCP) at the start of a hunt to au
 packages/   casefile · artifacts · acquisition · recon · swarm · identify · tor · profiles · runtime
 apps/       agent (tool-use loop) · mcp (connector)
 deploy/     docker-compose.yml — the P2P backend stack
+skills/     lost-media-hunting — the methodology skill that drives the VM (+ references/)
 VM_design.md   full architecture
 ```
+
+The [`lost-media-hunting`](skills/lost-media-hunting/SKILL.md) skill is the field methodology this VM operationalizes — drop it into a Claude client and it knows to hunt via these tools ([tool surface](skills/lost-media-hunting/references/nautilus-vm.md)).
 
 ## License
 
