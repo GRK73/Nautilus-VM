@@ -1,10 +1,12 @@
 import { mkdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { CaseFile } from '../../../packages/casefile/src/index.ts';
 import { ArtifactStore } from '../../../packages/artifacts/src/index.ts';
 import { Acquirer, Downloader } from '../../../packages/acquisition/src/index.ts';
 import { Recon, SearXNGSource, InternetArchiveSource, ProwlarrSource, AhmiaSource, BitmagnetSource } from '../../../packages/recon/src/index.ts';
 import { Swarm, QBittorrentAdapter, AmuleAdapter } from '../../../packages/swarm/src/index.ts';
+import type { CommandRunner } from '../../../packages/swarm/src/index.ts';
 import { Identifier, HttpReverseImageProvider } from '../../../packages/identify/src/index.ts';
 import { TorClient } from '../../../packages/tor/src/index.ts';
 import { Nautilus } from '../../../packages/runtime/src/index.ts';
@@ -80,8 +82,22 @@ export function buildVM(opts: WireOptions): WiredVM {
     enabled.push('qbittorrent');
   }
   if (env.AMULE_PASSWORD) {
-    swarm.register(new AmuleAdapter({ host: env.AMULE_HOST, password: env.AMULE_PASSWORD }));
-    enabled.push('amuled');
+    // When amuled runs in a container, amulecmd lives inside it — drive it via
+    // `docker exec <container> amulecmd …` instead of needing it on the host.
+    let runner: CommandRunner | undefined;
+    if (env.AMULE_DOCKER_CONTAINER) {
+      const dockerBin = env.DOCKER_BIN ?? 'docker';
+      const container = env.AMULE_DOCKER_CONTAINER;
+      runner = {
+        run(bin, args) {
+          const r = spawnSync(dockerBin, ['exec', container, bin, ...args], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+          if (r.error) return { status: -1, stdout: '', stderr: (r.error as Error).message };
+          return { status: r.status ?? -1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+        },
+      };
+    }
+    swarm.register(new AmuleAdapter({ host: env.AMULE_HOST ?? '127.0.0.1', password: env.AMULE_PASSWORD, runner }));
+    enabled.push(env.AMULE_DOCKER_CONTAINER ? 'amuled(docker)' : 'amuled');
   }
 
   const identifier = new Identifier(store, {

@@ -78,7 +78,8 @@ export class QBittorrentAdapter implements SwarmAdapter {
   #user: string | undefined;
   #pass: string | undefined;
   #timeout: number;
-  #sid: string | null = null;
+  /** Full `name=value` of qBittorrent's session cookie (name varies by version). */
+  #cookie: string | null = null;
 
   constructor(baseUrl: string, opts: QBittorrentOptions = {}) {
     this.#base = baseUrl.replace(/\/+$/, '');
@@ -88,7 +89,7 @@ export class QBittorrentAdapter implements SwarmAdapter {
   }
 
   #headers(extra: Record<string, string> = {}): Record<string, string> {
-    return this.#sid ? { cookie: `SID=${this.#sid}`, ...extra } : extra;
+    return this.#cookie ? { cookie: this.#cookie, ...extra } : extra;
   }
 
   async #login(): Promise<void> {
@@ -98,14 +99,19 @@ export class QBittorrentAdapter implements SwarmAdapter {
     if (!res.ok) throw new Error(`qbittorrent login HTTP ${res.status}`);
     const headers = res.headers as Headers & { getSetCookie?: () => string[] };
     const cookies = headers.getSetCookie?.() ?? (res.headers.get('set-cookie') ? [res.headers.get('set-cookie')!] : []);
+    // Session cookie is `SID` (<=4.x) or `QBT_SID_<port>` (5.x) — keep the whole pair.
     for (const c of cookies) {
-      const m = c.match(/SID=([^;]+)/);
-      if (m) this.#sid = m[1]!;
+      const pair = c.split(';')[0]?.trim();
+      if (pair && /sid/i.test(pair)) {
+        this.#cookie = pair;
+        break;
+      }
     }
+    if (!this.#cookie && cookies[0]) this.#cookie = cookies[0].split(';')[0]!.trim();
   }
 
   async #ensureAuth(): Promise<void> {
-    if (this.#user !== undefined && this.#sid === null) await this.#login();
+    if (this.#user !== undefined && this.#cookie === null) await this.#login();
   }
 
   async available(): Promise<boolean> {
