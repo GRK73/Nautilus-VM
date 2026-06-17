@@ -337,6 +337,37 @@ case.profile = "jp_media" | "western_tv" | "games"   // 자동감지 + 수동지
 | 케이스 저장소 | **SQLite + FTS5** | 단일 파일, 전문검색 |
 | GUI 자동화(PD/Share) | computer-use / UI 자동화 | Windows 서브샌드박스 구동 |
 
+### 7.6 `audio_match` — 후보군 대량 비교 (lostwave 종결자) ⭐ *설계, 미구현*
+
+**문제.** 짧은 음원(흥얼거림·잘린 클립·라디오 녹음)이 손에 있고, `discover`/`p2p_search`로 긁어온 **후보 음원이 수십~수백 개**일 때, 그걸 사람이 하나씩 들어볼 수는 없다. 레퍼런스 1개 ↔ 후보 N개를 **자동으로 비교·랭킹**하는 도구가 필요하다. 기존 `identify_fingerprint`는 "1개를 AcoustID에 조회"하는 것이고, 여기선 "**우리가 가진 코퍼스끼리** 대조"한다 — DB에 없는 진짜 lost media가 타깃이라 AcoustID는 못 맞춘다.
+
+**2단계 매칭 파이프라인** (정밀 → 퍼지, 싼 것부터):
+
+| 단계 | 방식 | OSS | 잡아내는 것 | 출력 |
+|---|---|---|---|---|
+| **A. 지문 매칭** (정밀) | landmark 해시 + 정렬 | **`worldveil/dejavu`** + **Chromaprint**(`pyacoustid`) | *동일 녹음*이 후보 안에 들어있나 — 압축·노이즈·앞뒤 잘림에 강함, **시간 오프셋**까지 | `{candidateId, offsetSec, confidence=정렬해시수}` |
+| **B. 특징 유사도** (퍼지) | 음악 특징 벡터 + DTW | **`librosa`**(MFCC·chroma CENS·spectral contrast·tempo) + **Essentia**(MusicExtractor: key/BPM/descriptor) | *다른 녹음*(커버·리마스터·재생속도·흥얼거림) — 지문이 안 붙는 경우의 graded 유사도 | `{candidateId, similarity 0..1}` |
+
+- **A가 히트하면 B는 생략**(정밀 일치 = 확정). A에서 안 걸린 후보만 B로 넘겨 0..1 유사도로 랭킹. 두 점수는 **방식 라벨을 달아 분리 제시**(fingerprint 히트는 항상 fuzzy 위에 랭크) — 거짓 동일축 비교 금지.
+- **Dejavu 흐름**: 후보 N개를 **임시(케이스별) 지문 DB**에 적재 → 레퍼런스 클립으로 `recognize` → "이 클립이 들어있는 후보 + 오프셋 + 신뢰도". 짧은 조각 → 풀 트랙 위치 찾기에 정확히 맞는 모델.
+- **Essentia vs librosa**: librosa로 chroma 시퀀스 DTW(키/템포 흔들림 보정), Essentia `MusicExtractor`로 key·BPM·descriptor 벡터 → 코사인. 둘을 합쳐 B 점수 산출.
+
+**아키텍처 적합화 (TS 프로젝트에 Python 얹기).** 위 라이브러리는 전부 Python·중량(numpy/scipy/ffmpeg/essentia). 기존 `identify`의 **주입식 `ToolRunner` 패턴 그대로**, 별도 **Python 사이드카**(`tools/audio-match/`, 자체 venv 또는 컨테이너)로 격리하고 Node는 CLI로 호출한다.
+
+```
+audio_match { referenceId, candidateIds[], mode?: 'auto'|'fingerprint'|'features', topK? }
+  → AudioMatcher (packages/identify)         # 아티팩트 id → blob 경로 해석
+    → python tools/audio-match/match.py        # 사이드카: dejavu+chromaprint / librosa+essentia
+      → [{ candidateId, method:'fingerprint'|'features', score, offsetSec?, summary }]  # score 내림차순
+```
+
+- **도구 표면**: `audio_match`(비교 프리미티브) 1개를 추가(21→22+). **대량 다운로드 루프는 에이전트/스킬이 운전**: `discover`/`p2p_search` → 상위 N개 `download`/`p2p_download` → `p2p_jobs` 폴링 → `audio_match` → 상위 후보 `case_evidence_attach`. (원하면 이 루프를 `audio_hunt {referenceId, query}` 상위 도구로 캡슐화 가능하나, 결합도↑라 1차는 프리미티브만.)
+- **아티팩트·프로비넌스**: 레퍼런스·후보 전부 content-addressed 아티팩트. 결과는 방식·점수·오프셋과 함께 케이스파일 evidence로 적재.
+- **Graceful degradation**: 사이드카/deps 부재 시 구조화 에러 — `audio_match unavailable: pip install -r tools/audio-match/requirements.txt (dejavu, pyacoustid, librosa, essentia), 또는 vm.exec`. 단계별 독립: chromaprint만 있고 essentia가 없으면 A만 수행.
+- **성능**: A 지문화는 후보당 1회·캐시(아티팩트 sha256 키), B는 A 미스에만. N이 크면 사이드카가 후보 배치를 병렬 처리.
+
+→ `identify_fingerprint`(외부 DB 조회)와 상보적: **AcoustID에 없는** 미등록 음원을 *내 코퍼스끼리* 좁히는 게 `audio_match`의 존재 이유다.
+
 ---
 
 ## 8. Perfect Dark / Share — 정직한 해법

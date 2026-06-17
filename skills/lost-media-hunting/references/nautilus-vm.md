@@ -39,6 +39,24 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 - `identify_frames {artifactId, everySec?, limit?}` → extract video keyframes as new image artifacts (then OCR / reverse-search them).
 - `image_reverse {artifactId}` → reverse image search → visual matches (find a clip/screenshot's source).
 
+#### Enabling the `identify_*` tools (external binaries — manual install)
+
+These tools shell out to host-side CLI binaries; they are **not** in the Docker stack (that's only the P2P daemons) and are **not** auto-installed. If a binary is missing, the tool returns a structured error — `… exit -1: spawnSync fpcalc ENOENT. Install chromaprint (provides fpcalc), or use vm.exec.` — so you can read it and either install the tool or fall back to `vm.exec`. Each tool degrades independently: you only need the binary for the method you call.
+
+| Tool / method | Binary | Install (Windows / macOS) | Extra |
+|---|---|---|---|
+| `identify_probe`, `identify_frames` | ffmpeg (`ffprobe`/`ffmpeg`) | `winget install Gyan.FFmpeg` / `brew install ffmpeg` | — |
+| `identify_fingerprint` | chromaprint (`fpcalc`) | `choco install chromaprint` / `brew install chromaprint` | `ACOUSTID_KEY` env to resolve fingerprints against AcoustID/MusicBrainz |
+| `identify_transcribe` | whisper (`whisper-cli` or `openai-whisper`) | whisper.cpp build, or `pip install openai-whisper` | override binary name via `bins.whisper` |
+| `identify_ocr` | tesseract | `winget install UB-Mannheim.TesseractOCR` / `brew install tesseract` | language packs for non-`eng` |
+| `image_reverse` | none (HTTP backend) | — | `REVERSE_IMAGE_URL` env (no clean free API — bring your own) |
+
+Notes:
+- **Verify before calling**: `Identifier.available(tool)` (`which`/`where` probe) tells you whether a binary is on PATH without running it. The runtime tools just attempt and surface the install hint on failure.
+- **Custom paths**: pass `bins: { fpcalc: 'C:\\tools\\fpcalc.exe', whisper: 'whisper-cli', … }` to the `Identifier` constructor to point at non-PATH installs.
+- **`identify_fingerprint` without `ACOUSTID_KEY`** still returns the raw chromaprint fingerprint + duration (useful for local A/B comparison); it just can't name the track via AcoustID.
+- **lostwave end-to-end**: `download`/`p2p_download` the candidate → `identify_fingerprint` (needs `fpcalc`) → attach the match as `case_evidence_attach`. A planned `audio_match` tool (bulk-compare a reference clip against many downloaded candidates) is designed in `VM_design.md §7.6`.
+
 ## Domain profiles
 
 Set one at triage; it tunes source priority, P2P network order, identify defaults, and search guidance.
