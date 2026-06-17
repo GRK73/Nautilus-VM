@@ -208,6 +208,22 @@ VM_design.md   full architecture
 
 The [`lost-media-hunting`](skills/lost-media-hunting/SKILL.md) skill is the field methodology this VM operationalizes — drop it into a Claude client and it knows to hunt via these tools ([tool surface](skills/lost-media-hunting/references/nautilus-vm.md)).
 
+## Manual setup (not auto-installed)
+
+Everything in the TypeScript core runs with just **Node 24** (`npm install` pulls only `typescript` + `@types/node`). The pieces below are **not** installed for you — Nautilus shells out to them, and each tool degrades gracefully with a structured "install X" error if its binary/daemon is missing, so you only need what a given hunt actually uses:
+
+| What | Needed for | Install |
+|---|---|---|
+| **Node 24+** | everything (native TS type-stripping) | [nodejs.org](https://nodejs.org) |
+| **Docker Desktop** | the P2P backend stack (`deploy/`); `compose up` then auto-pulls the daemon images | `winget install Docker.DockerDesktop` |
+| **ffmpeg** (`ffprobe` + `ffmpeg`) | `identify_probe`, `identify_frames` | `winget install Gyan.FFmpeg` / `brew install ffmpeg` |
+| **chromaprint** (`fpcalc`) | `identify_fingerprint` (lostwave) | `choco install chromaprint` / `brew install chromaprint` |
+| **whisper** (`whisper-cli` or `openai-whisper`) | `identify_transcribe` | whisper.cpp build, or `pip install openai-whisper` |
+| **tesseract** | `identify_ocr` | `winget install UB-Mannheim.TesseractOCR` / `brew install tesseract` |
+| **yt-dlp** | `download` of site-embedded media | `winget install yt-dlp.yt-dlp` / `pip install yt-dlp` |
+
+**API keys (env):** `ANTHROPIC_API_KEY` for the bundled agent; `ACOUSTID_KEY` for AcoustID fingerprint lookups. The optional source backends in the env table above (SearXNG / Prowlarr / bitmagnet / qBittorrent / aMule / Tor) are also operator-provided — the Docker stack in `deploy/` brings up the ones it can.
+
 ## License
 
-TBD.
+MIT.
