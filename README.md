@@ -40,7 +40,7 @@ Everything bulky (a web page, a torrent, a video) is stored **once**, content-ad
 
 ## The tools
 
-22 core tools, plus `case_open` / `case_list` added by the agent/MCP wiring (per-case folders — see below) for **24** in normal use.
+23 core tools, plus `case_open` / `case_list` added by the agent/MCP wiring (per-case folders — see below) for **25** in normal use.
 
 | Group | Tools |
 |---|---|
@@ -48,21 +48,23 @@ Everything bulky (a web page, a torrent, a video) is stored **once**, content-ad
 | **Find** | `discover(query, scope)` — fans across **surface / archive / deep / dark** at once, returns unified candidates + per-source coverage · `fetch(url)` (cached; `.onion` routes through Tor) · `archive_lookup(url)` (Wayback) · `read_artifact(id)` (ranged drill-down) |
 | **Acquire** | `download(url)` (HTTP stream / yt-dlp) · `p2p_search` (seeders + health) · `p2p_download` (magnet/ed2k → async job) · `p2p_jobs` |
 | **Identify** (binary → text clue) | `identify_fingerprint` (chromaprint + AcoustID — *lostwave*) · `audio_match` (reference clip ↔ local candidate corpus) · `identify_transcribe` (whisper) · `identify_ocr` (tesseract) · `identify_probe` (ffprobe) · `identify_frames` (video → keyframes) · `image_reverse` |
+| **Flash review** | `flash_review` — batch SWF metadata/tag/asset/risk analysis; optional isolated JPEXS dump + Ruffle render/input smoke test with screenshot artifacts |
 
 ---
 
 ## Packages
 
-A TypeScript monorepo — **9 packages + 2 apps**, **95 tests** passing, plus a Docker audio-matcher integration test.
+A TypeScript monorepo — **10 packages + 2 apps**, with Docker integration tests for audio matching and Flash review.
 
 | Module | What |
 |---|---|
 | `@aivm/casefile` | The investigation external brain — leads, evidence, entities, dead-ends, timeline, FTS, digest/report. `node:sqlite` + FTS5, **zero runtime deps**. |
 | `@aivm/artifacts` | Content-addressed store — `sha256` = id, provenance, dedup/cache, ranged reads, streaming ingest for big files. |
 | `@aivm/acquisition` | `fetch` (HTML → text + summary + links, URL-cached) · Wayback `archive_lookup/get` · `download` (stream / yt-dlp). Zero-dep HTML processing. |
-| `@aivm/recon` | Federated `discover()` across 4 tiers: SearXNG (surface) · Internet Archive (archive) · Prowlarr + **bitmagnet DHT** (deep) · Ahmia (dark). Pluggable `Source` interface + coverage. |
+| `@aivm/recon` | Federated `discover()` across 4 tiers: SearXNG + Wikipedia + TVMaze (surface) · Internet Archive + Wikimedia Commons + Open Library (archive) · Prowlarr + **bitmagnet DHT** (deep) · Ahmia (dark). Cross-source rank fusion + coverage. |
 | `@aivm/swarm` | Unified job-based P2P — qBittorrent (BT) + amuled (eD2k/Kad) adapters, URI routing (magnet→bt, ed2k→ed2k), search-by-health. |
 | `@aivm/identify` | Binary → text clue: ffprobe, audio fingerprint, transcribe, OCR, video keyframes, reverse image. Injectable tool runner → testable with no binaries. |
+| `@aivm/flash` | Safe FWS/CWS parsing plus isolated JPEXS/Ruffle batch review. Captures metadata, ActionScript generation, assets, URLs, risk flags, screenshots, and diagnostics. |
 | `@aivm/tor` | Zero-dependency Tor SOCKS5 gateway (hand-rolled SOCKS5 + TLS + HTTP/chunked). `fetch` routes `.onion` through it transparently. |
 | `@aivm/profiles` | Domain profiles (`jp_media` / `western_tv` / `games`): source & network priority, identify defaults, agent guidance. |
 | `@aivm/runtime` | **The VM surface** — wires every package into the tool surface and dispatches calls. `toAnthropicTools()` + `call()`. |
@@ -83,7 +85,7 @@ A TypeScript monorepo — **9 packages + 2 apps**, **95 tests** passing, plus a 
 
 ```bash
 npm install            # dev deps only (typescript, @types/node)
-npm test               # 91 tests, all packages (node --test auto-discovers)
+npm test               # 103 tests, all packages (node --test auto-discovers)
 npm run typecheck      # tsc, per package
 
 # self-contained demos (no external services / API key)
@@ -98,6 +100,10 @@ Build the optional isolated audio matcher before the first `audio_match` call:
 
 ```bash
 docker build -t nautilus-audio-match:local tools/audio-match
+npm run test:audio-match
+
+docker build -t nautilus-flash-review:local tools/flash-review
+npm run test:flash-review
 ```
 
 ---
@@ -132,7 +138,7 @@ ANTHROPIC_API_KEY=… npm run agent -- --profile=jp_media --workdir=./cases/jing
   "Find the 1995 Japanese radio jingle with a synth melody and no vocals"
 ```
 
-Works with just an API key + internet (Internet Archive, Ahmia listing, `fetch`/`archive`/`download` are always on). Optional sources switch on via env — see the table below.
+Works with just an API key + internet: Wikipedia, Wikimedia Commons, Open Library, TVMaze, Internet Archive, Ahmia, `fetch`, archive lookup, and download are always on. The Docker stack adds local SearXNG general-web metasearch by default.
 
 ---
 
@@ -148,7 +154,12 @@ Works with just an API key + internet (Internet Archive, Ahmia listing, `fetch`/
     "nautilus": {
       "command": "node",
       "args": ["--disable-warning=ExperimentalWarning", "apps/mcp/src/stdio.ts"],
-      "env": { "NAUTILUS_WORKDIR": "./cases/mcp", "NAUTILUS_PROFILE": "" }
+      "env": {
+        "NAUTILUS_WORKDIR": "./cases/mcp",
+        "NAUTILUS_PROFILE": "",
+        "SEARXNG_URL": "http://127.0.0.1:8888",
+        "BITMAGNET_URL": "http://127.0.0.1:3333"
+      }
     }
   }
 }
@@ -162,7 +173,9 @@ Works with just an API key + internet (Internet Archive, Ahmia listing, `fetch`/
 
 | Env | Enables |
 |---|---|
-| `SEARXNG_URL` | Surface meta-search (70+ engines) |
+| `SEARXNG_URL` | Surface meta-search (70+ engines); defaults to local `http://127.0.0.1:8888`, set `off` to disable |
+| `SEARXNG_ENGINES` | Optional comma-separated upstream-engine restriction |
+| `WIKIPEDIA_URL` | Alternate MediaWiki base (default English Wikipedia; useful for another language) |
 | `PROWLARR_URL` + `PROWLARR_API_KEY` | Deep: torrent + Usenet indexers |
 | `BITMAGNET_URL` | Deep: bitmagnet BitTorrent DHT crawler (GraphQL) |
 | `QBITTORRENT_URL` (+ `_USER` / `_PASS`) | BitTorrent downloads |
@@ -170,13 +183,14 @@ Works with just an API key + internet (Internet Archive, Ahmia listing, `fetch`/
 | `ACOUSTID_KEY` | Audio fingerprint lookups (lostwave) |
 | `REVERSE_IMAGE_URL` | Reverse image search backend |
 | `AUDIO_MATCH_IMAGE` | Corpus audio matcher image (default `nautilus-audio-match:local`) |
+| `FLASH_REVIEW_IMAGE` | JPEXS + Ruffle review image (default `nautilus-flash-review:local`) |
 | `TOR_SOCKS_HOST` / `TOR_SOCKS_PORT` | Tor gateway for `.onion` (default `127.0.0.1:9050`) |
 
 ---
 
-## P2P backends in isolated containers
+## Search/P2P backends in isolated containers
 
-The daemons (Tor, qBittorrent, amuled, bitmagnet) are heavy and join monitored networks — so they run in **Docker containers**, not on the bare host. This *is* the sandbox/isolation layer: the swarms and any downloaded bytes stay in containers; Nautilus stays on the host and connects over `localhost` ports.
+The daemons (SearXNG, Tor, qBittorrent, amuled, bitmagnet) run in **Docker containers**, not on the bare host. SearXNG is bound only to `127.0.0.1:8888`; swarm clients and downloaded bytes remain isolated from the host process space.
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d
@@ -210,7 +224,7 @@ Set `--profile` (agent) or `NAUTILUS_PROFILE` (MCP) at the start of a hunt to au
 ## Repo layout
 
 ```
-packages/   casefile · artifacts · acquisition · recon · swarm · identify · tor · profiles · runtime
+packages/   casefile · artifacts · acquisition · recon · swarm · identify · flash · tor · profiles · runtime
 apps/       agent (tool-use loop) · mcp (connector)
 deploy/     docker-compose.yml — the P2P backend stack
 skills/     lost-media-hunting — the methodology skill that drives the VM (+ references/)
@@ -233,8 +247,9 @@ Everything in the TypeScript core runs with just **Node 24** (`npm install` pull
 | **tesseract** | `identify_ocr` | `winget install UB-Mannheim.TesseractOCR` / `brew install tesseract` |
 | **yt-dlp** | `download` of site-embedded media | `winget install yt-dlp.yt-dlp` / `pip install yt-dlp` |
 | **Docker audio matcher** | `audio_match` local-corpus comparison | `docker build -t nautilus-audio-match:local tools/audio-match` |
+| **Docker Flash reviewer** | `flash_review` runtime/full modes | `docker build -t nautilus-flash-review:local tools/flash-review` |
 
-**API keys (env):** `ANTHROPIC_API_KEY` for the bundled agent; `ACOUSTID_KEY` for AcoustID fingerprint lookups. The optional source backends in the env table above (SearXNG / Prowlarr / bitmagnet / qBittorrent / aMule / Tor) are also operator-provided — the Docker stack in `deploy/` brings up the ones it can.
+**API keys (env):** `ANTHROPIC_API_KEY` for the bundled agent; `ACOUSTID_KEY` for AcoustID fingerprint lookups. Wikipedia, Commons, Open Library, TVMaze, Internet Archive, Ahmia, and local SearXNG need no key. Prowlarr/qBittorrent credentials remain operator-provided.
 
 ## License
 

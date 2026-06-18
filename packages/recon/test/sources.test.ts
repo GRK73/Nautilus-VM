@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { AhmiaSource, BitmagnetSource, InternetArchiveSource, ProwlarrSource, Recon } from '../src/index.ts';
+import { AhmiaSource, BitmagnetSource, InternetArchiveSource, OpenLibrarySource, ProwlarrSource, Recon, TvMazeSource, WikimediaSource } from '../src/index.ts';
 
 async function listen(handler: Parameters<typeof createServer>[1]): Promise<{ base: string; server: Server }> {
   const server = createServer(handler);
@@ -130,6 +130,57 @@ test('AhmiaSource.parse extracts onion targets via redirect_url and cite', () =>
   assert.equal(hits[0]!.title, 'Lost Tape Archive');
   assert.equal(hits[0]!.tier, 'dark');
   assert.equal(hits[1]!.url, 'http://second2222.onion/');
+});
+
+// ---- Public no-key catalogs ----
+
+test('WikimediaSource maps MediaWiki search results for Wikipedia or Commons', async () => {
+  const { base, server } = await listen((req, res) => {
+    assert.ok(req.url?.startsWith('/w/api.php?'));
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ query: { search: [{ pageid: 7, title: 'Lost television broadcast', snippet: '<span class="searchmatch">Lost</span> broadcast archive' }] } }));
+  });
+  try {
+    const source = new WikimediaSource({ baseUrl: base, name: 'test-wiki' });
+    const hits = await source.search('lost broadcast');
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0]!.url, `${base}/wiki/Lost_television_broadcast`);
+    assert.equal(hits[0]!.snippet, 'Lost broadcast archive');
+    assert.equal(hits[0]!.source, 'test-wiki');
+  } finally {
+    server.close();
+  }
+});
+
+test('OpenLibrarySource maps source records with creator and date clues', async () => {
+  const { base, server } = await listen((req, res) => {
+    assert.ok(req.url?.startsWith('/search.json?'));
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ docs: [{ key: '/works/OL123W', title: 'Forgotten Television', author_name: ['A. Researcher'], first_publish_year: 1988, edition_count: 2 }] }));
+  });
+  try {
+    const hits = await new OpenLibrarySource({ baseUrl: base }).search('forgotten television');
+    assert.equal(hits[0]!.url, `${base}/works/OL123W`);
+    assert.match(hits[0]!.snippet, /A\. Researcher.*1988.*2 edition/);
+    assert.equal(hits[0]!.tier, 'archive');
+  } finally {
+    server.close();
+  }
+});
+
+test('TvMazeSource maps TV existence and broadcast metadata', async () => {
+  const { base, server } = await listen((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify([{ score: 0.91, show: { id: 9, name: 'Forgotten Pilot', url: 'https://tvmaze.com/shows/9/forgotten', type: 'Scripted', premiered: '1987-04-01', network: { name: 'WXYZ' }, summary: '<p>Unaired local pilot</p>' } }]));
+  });
+  try {
+    const hits = await new TvMazeSource({ baseUrl: base }).search('forgotten pilot');
+    assert.equal(hits[0]!.title, 'Forgotten Pilot');
+    assert.match(hits[0]!.snippet, /1987-04-01.*WXYZ.*Unaired local pilot/);
+    assert.equal(hits[0]!.engine, 'tv-catalog');
+  } finally {
+    server.close();
+  }
 });
 
 // ---- All four tiers through one discover() ----

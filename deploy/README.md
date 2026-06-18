@@ -1,4 +1,4 @@
-# Nautilus P2P backend stack (Docker)
+# Nautilus search/P2P backend stack (Docker)
 
 Brings up every P2P/network daemon **in isolated containers** — the sandbox
 layer from `VM_design.md` §6.1 — so the bare host never joins the swarms or
@@ -7,8 +7,8 @@ host and connects to the containers over `localhost:<mapped port>`.
 
 ```
 ┌── host ──────────────┐        ┌── docker (isolated) ──────────────┐
-│ Claude Desktop        │        │ tor:9050  qbittorrent:8080         │
-│  └ nautilus MCP (node)│ ─────▶ │ bitmagnet:3333 (+postgres)         │
+│ Claude Desktop        │        │ searxng:8888  tor:9050             │
+│  └ nautilus MCP (node)│ ─────▶ │ qbittorrent:8080 bitmagnet:3333    │
 │     connects via      │  ports │ amule:4712 (EC)                    │
 │     localhost ports   │        └────────────────────────────────────┘
 └───────────────────────┘
@@ -45,7 +45,8 @@ restart Claude Desktop:
 "QBITTORRENT_PASS": "<from docker logs>",
 "AMULE_HOST": "localhost",
 "AMULE_PASSWORD": "nautilus",
-"BITMAGNET_URL": "http://localhost:3333"
+"BITMAGNET_URL": "http://localhost:3333",
+"SEARXNG_URL": "http://localhost:8888"
 ```
 
 (Tor needs no env — the gateway defaults to `127.0.0.1:9050`, which the `tor`
@@ -53,15 +54,17 @@ container exposes.)
 
 ## 4. Verify
 
-- Port probe: `9050`, `8080`, `3333`, `4712` should be UP.
-- In Claude: `p2p_search` / `discover scope:"deep"` should now return torrents;
+- Port probe: `8888`, `9050`, `8080`, `3333`, `4712` should be UP.
+- `http://127.0.0.1:8888/search?q=test&format=json` should return SearXNG JSON.
+- In Claude: `discover scope:"surface"` should return general-web results and
+  `p2p_search` / `discover scope:"deep"` should return configured torrent sources;
   `.onion` URLs become fetchable. bitmagnet needs a while to crawl the DHT before
   its search returns much.
 
 ## Caveats
 
-- **Verified running on Docker Desktop / Windows (WSL2):** all five containers
-  come up; qBittorrent WebUI, bitmagnet GraphQL, Tor SOCKS, and aMule EC (Kad
+- **Verified running on Docker Desktop / Windows (WSL2):** all six containers
+  come up; SearXNG JSON search, qBittorrent WebUI, bitmagnet GraphQL, Tor SOCKS, and aMule EC (Kad
   connected) are all reachable and drive the Nautilus adapters.
 - **bitmagnet DHT crawling barely works on Docker Desktop / Windows.** The
   crawler depends on receiving inbound UDP from arbitrary DHT peers, and Docker

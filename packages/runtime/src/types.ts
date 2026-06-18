@@ -4,6 +4,7 @@ import type { Acquirer, Downloader } from '../../acquisition/src/index.ts';
 import type { Recon } from '../../recon/src/index.ts';
 import type { Swarm } from '../../swarm/src/index.ts';
 import type { Identifier } from '../../identify/src/index.ts';
+import type { FlashReviewer } from '../../flash/src/index.ts';
 
 /** Minimal JSON Schema for a tool's input (Anthropic tool_use `input_schema`). */
 export interface JSONSchema {
@@ -63,6 +64,8 @@ export interface ToolContext {
   recon: Recon;
   swarm: Swarm;
   identifier: Identifier;
+  /** Optional isolated Flash/SWF analysis surface. */
+  flashReviewer?: FlashReviewer;
   /** Optional: when set, `case_open`/`case_list` tools are exposed. */
   caseManager?: CaseManager;
 }

@@ -97,3 +97,27 @@ test('a failing source is reported as error, others still return', async () => {
     server.close();
   }
 });
+
+test('rank fusion preserves source diversity and rewards independent agreement', async () => {
+  class RankedSource implements Source {
+    readonly name: string;
+    readonly tier: 'surface' | 'archive';
+    readonly urls: string[];
+    constructor(name: string, tier: 'surface' | 'archive', urls: string[]) {
+      this.name = name;
+      this.tier = tier;
+      this.urls = urls;
+    }
+    async available() { return true; }
+    async search(): Promise<Candidate[]> {
+      return this.urls.map((url, index) => ({ title: `${this.name}-${index}`, url, snippet: '', tier: this.tier, source: this.name, score: 999 - index }));
+    }
+  }
+  const recon = new Recon()
+    .addSource(new RankedSource('web', 'surface', ['https://shared.example/item', 'https://web.example/second']))
+    .addSource(new RankedSource('archive', 'archive', ['https://shared.example/item', 'https://archive.example/second']));
+  const result = await recon.discover('q');
+  assert.equal(result.candidates[0]!.url, 'https://shared.example/item');
+  assert.equal(result.candidates[0]!.score, 2, 'first place in two independent sources is fused');
+  assert.deepEqual(result.candidates.slice(1).map((candidate) => candidate.url).sort(), ['https://archive.example/second', 'https://web.example/second']);
+});

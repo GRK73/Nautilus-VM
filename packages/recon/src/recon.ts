@@ -43,17 +43,29 @@ export class Recon {
     );
 
     const coverage: Coverage = {};
-    const merged = new Map<string, Candidate>();
+    const merged = new Map<string, { candidate: Candidate; fusionScore: number; sources: Set<string> }>();
     for (const r of settled) {
       coverage[r.name] = r.ok ? 'ok' : 'error';
-      for (const c of r.items) {
+      for (let rank = 0; rank < r.items.length; rank++) {
+        const c = r.items[rank]!;
         const key = normalizeUrl(c.url);
         const prev = merged.get(key);
-        if (!prev || (c.score ?? 0) > (prev.score ?? 0)) merged.set(key, c);
+        // Scores from unrelated APIs are not comparable (seeders, text score,
+        // engine relevance). Fuse per-source ranks instead, and reward the same
+        // URL appearing independently in several sources.
+        const rankScore = 1 / (rank + 1);
+        if (!prev) {
+          merged.set(key, { candidate: { ...c }, fusionScore: rankScore, sources: new Set([r.name]) });
+        } else if (!prev.sources.has(r.name)) {
+          prev.fusionScore += rankScore;
+          prev.sources.add(r.name);
+        }
       }
     }
 
-    let candidates = [...merged.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    let candidates = [...merged.values()]
+      .sort((a, b) => b.fusionScore - a.fusionScore)
+      .map(({ candidate, fusionScore }) => ({ ...candidate, score: fusionScore }));
     if (opts.limit !== undefined) candidates = candidates.slice(0, opts.limit);
 
     return { query, candidates, coverage };

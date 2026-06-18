@@ -13,7 +13,7 @@
   },
   "scripts": {
     "test": "node --test --disable-warning=ExperimentalWarning",
-    "typecheck": "tsc -p packages/casefile/tsconfig.json && tsc -p packages/artifacts/tsconfig.json && tsc -p packages/acquisition/tsconfig.json && tsc -p packages/recon/tsconfig.json && tsc -p packages/swarm/tsconfig.json && tsc -p packages/identify/tsconfig.json && tsc -p packages/runtime/tsconfig.json && tsc -p packages/profiles/tsconfig.json && tsc -p packages/tor/tsconfig.json && tsc -p apps/agent/tsconfig.json && tsc -p apps/mcp/tsconfig.json",
+    "typecheck": "tsc -p packages/casefile/tsconfig.json && tsc -p packages/artifacts/tsconfig.json && tsc -p packages/acquisition/tsconfig.json && tsc -p packages/recon/tsconfig.json && tsc -p packages/swarm/tsconfig.json && tsc -p packages/identify/tsconfig.json && tsc -p packages/flash/tsconfig.json && tsc -p packages/runtime/tsconfig.json && tsc -p packages/profiles/tsconfig.json && tsc -p packages/tor/tsconfig.json && tsc -p apps/agent/tsconfig.json && tsc -p apps/mcp/tsconfig.json",
     "demo:casefile": "node --disable-warning=ExperimentalWarning packages/casefile/examples/demo.ts",
     "demo:artifacts": "node --disable-warning=ExperimentalWarning packages/artifacts/examples/demo.ts",
     "demo:acquisition": "node --disable-warning=ExperimentalWarning packages/acquisition/examples/demo.ts",
@@ -22,6 +22,7 @@
     "demo:identify": "node --disable-warning=ExperimentalWarning packages/identify/examples/demo.ts",
     "demo:runtime": "node --disable-warning=ExperimentalWarning packages/runtime/examples/demo.ts",
     "test:audio-match": "node --disable-warning=ExperimentalWarning tools/audio-match/integration.ts",
+    "test:flash-review": "node --disable-warning=ExperimentalWarning tools/flash-review/integration.ts",
     "agent": "node --disable-warning=ExperimentalWarning apps/agent/src/cli.ts",
     "mcp": "node --disable-warning=ExperimentalWarning apps/mcp/src/stdio.ts"
   },

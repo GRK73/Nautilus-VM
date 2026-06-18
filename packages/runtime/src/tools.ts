@@ -200,5 +200,23 @@ export function buildTools(ctx: ToolContext): Tool[] {
         return { count: frames.length, frames: frames.map((f) => ({ artifactId: f.id, title: f.title })) };
       },
     },
+    ...(ctx.flashReviewer
+      ? [
+          {
+            name: 'flash_review',
+            description:
+              'Batch-review Flash SWF artifacts. Static mode parses metadata, tags, ActionScript, assets, URLs, and risk clues without execution. Runtime/full modes use an isolated JPEXS + Ruffle container and return screenshot/diagnostic artifact ids.',
+            inputSchema: obj(
+              {
+                artifactIds: strArray('SWF artifact ids, up to 50'),
+                mode: str('static|runtime|full; default static'),
+                timeoutSec: num('runtime smoke-test duration, 2..60 seconds; default 12'),
+              },
+              ['artifactIds'],
+            ),
+            handler: async (a: Record<string, any>) => ctx.flashReviewer!.review(a.artifactIds, { mode: a.mode, timeoutSec: a.timeoutSec }),
+          },
+        ]
+      : []),
   ];
 }

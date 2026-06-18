@@ -6,7 +6,7 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 
 ## The tools
 
-22 core tools + `case_open`/`case_list` (added by the agent/MCP wiring) = 24 in normal use.
+23 core tools + `case_open`/`case_list` (added by the agent/MCP wiring) = 25 in normal use.
 
 ### Memory — the case file (external brain)
 - `case_open {topic}` → pick the folder this investigation lives in. **Call this FIRST.** The SAME topic reuses its existing folder (and resumes its memory); a NEW topic starts a fresh, isolated case — so separate hunts never read each other's leads. Returns `{ reused, slug, digest }`.
@@ -20,7 +20,7 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 - `case_search {query}` — full-text search across leads/evidence/entities/notes (FTS, works in Japanese).
 
 ### Find — discovery & acquisition
-- `discover {query, scope?}` — fan one query across sources; `scope` = `all|surface|archive|deep|dark`. Returns unified `candidates` + per-source `coverage` (so you know where you looked). Sources: SearXNG (surface), Internet Archive (archive), Prowlarr + bitmagnet DHT (deep), Ahmia (dark).
+- `discover {query, scope?}` — fan one query across sources; `scope` = `all|surface|archive|deep|dark`. Returns rank-fused `candidates` + per-source `coverage`. Defaults: local SearXNG, Wikipedia, TVMaze, Wikimedia Commons, Open Library, Internet Archive, and Ahmia; configured Prowlarr/bitmagnet add deep search.
 - `fetch {url}` → stores the raw page as an artifact, returns `{ artifactId, title, summary, links, status, cached }`. Re-fetching a URL is free (cached). **`.onion` URLs route through the Tor gateway automatically** (when Tor is running).
 - `archive_lookup {url}` → Wayback snapshots (resurrect deleted pages).
 - `read_artifact {artifactId, offset?, length?}` → cleaned, ranged text for pages; binary info otherwise.
@@ -35,6 +35,7 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 - `identify_probe {artifactId}` → ffprobe metadata (duration, codecs, dimensions).
 - `identify_fingerprint {artifactId}` → chromaprint + AcoustID lookup → matches. **The lostwave workhorse.**
 - `audio_match {referenceId, candidateIds[], mode?, topK?}` → exact landmark matches first, then fuzzy chroma/MFCC subsequence DTW for misses. Scores are method-labelled and include offsets.
+- `flash_review {artifactIds[], mode?, timeoutSec?}` → static SWF structure/risk review; `runtime`/`full` adds isolated Ruffle screenshots and `full` adds a JPEXS dump. A rendered smoke test is not proof that a game can be completed.
 - `identify_transcribe {artifactId, language?}` → speech → text (whisper).
 - `identify_ocr {artifactId, lang?}` → text out of an image (tesseract).
 - `identify_frames {artifactId, everySec?, limit?}` → extract video keyframes as new image artifacts (then OCR / reverse-search them).
@@ -91,7 +92,7 @@ As an **MCP connector** (so any Claude client calls the tools directly), registe
 
 The tools then appear as `mcp__nautilus__discover`, `mcp__nautilus__identify_fingerprint`, etc. (It can fetch `.onion` and drive P2P — enable deliberately.)
 
-Both the agent and the MCP server work with just an API key + internet (Internet Archive, Ahmia listing, fetch/archive/download are always on). Optional sources switch on via env:
+Both the agent and MCP server work with just internet for Wikipedia, Commons, Open Library, TVMaze, Internet Archive, Ahmia, fetch/archive/download. The Docker stack exposes SearXNG on `127.0.0.1:8888`; optional authenticated sources switch on via env:
 
 - `SEARXNG_URL` — surface meta-search (70+ engines)
 - `PROWLARR_URL` + `PROWLARR_API_KEY` — deep: torrent + Usenet indexers

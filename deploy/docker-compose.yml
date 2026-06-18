@@ -11,6 +11,16 @@
 name: nautilus
 
 services:
+  # General web metasearch (JSON API) -> Nautilus default http://127.0.0.1:8888.
+  searxng:
+    image: searxng/searxng:latest
+    container_name: nautilus-searxng
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    restart: unless-stopped
+
   # .onion fetch — exposes a SOCKS5 proxy on 9050 (Nautilus default TOR_SOCKS).
   tor:
     image: osminogin/tor-simple:latest

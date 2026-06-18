@@ -1,0 +1,16 @@
+[mcp_servers.nautilus]
+command = "node"
+args = [
+    "--disable-warning=ExperimentalWarning",
+    "apps/mcp/src/stdio.ts",
+]
+
+[mcp_servers.nautilus.env]
+NAUTILUS_WORKDIR = "./cases/mcp"
+NAUTILUS_PROFILE = ""
+SEARXNG_URL = "http://127.0.0.1:8888"
+BITMAGNET_URL = "http://127.0.0.1:3333"
+TOR_SOCKS_HOST = "127.0.0.1"
+TOR_SOCKS_PORT = "9050"
+AUDIO_MATCH_IMAGE = "nautilus-audio-match:local"
+FLASH_REVIEW_IMAGE = "nautilus-flash-review:local"

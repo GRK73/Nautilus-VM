@@ -5,10 +5,21 @@ import { join } from 'node:path';
 import { CaseFile } from '../../../packages/casefile/src/index.ts';
 import { ArtifactStore } from '../../../packages/artifacts/src/index.ts';
 import { Acquirer, Downloader } from '../../../packages/acquisition/src/index.ts';
-import { Recon, SearXNGSource, InternetArchiveSource, ProwlarrSource, AhmiaSource, BitmagnetSource } from '../../../packages/recon/src/index.ts';
+import {
+  Recon,
+  SearXNGSource,
+  InternetArchiveSource,
+  ProwlarrSource,
+  AhmiaSource,
+  BitmagnetSource,
+  WikimediaSource,
+  OpenLibrarySource,
+  TvMazeSource,
+} from '../../../packages/recon/src/index.ts';
 import { Swarm, QBittorrentAdapter, AmuleAdapter } from '../../../packages/swarm/src/index.ts';
 import type { CommandRunner } from '../../../packages/swarm/src/index.ts';
 import { Identifier, HttpReverseImageProvider } from '../../../packages/identify/src/index.ts';
+import { FlashReviewer } from '../../../packages/flash/src/index.ts';
 import { TorClient } from '../../../packages/tor/src/index.ts';
 import { Nautilus } from '../../../packages/runtime/src/index.ts';
 import type { CaseInfo, CaseManager, CaseOpenResult, ToolContext } from '../../../packages/runtime/src/index.ts';
@@ -35,6 +46,7 @@ interface CaseBackends {
   acquirer: Acquirer;
   downloader: Downloader;
   identifier: Identifier;
+  flashReviewer: FlashReviewer;
 }
 
 /** Slug for the implicit case used before the agent calls case_open. */
@@ -100,18 +112,34 @@ export function buildVM(opts: WireOptions): WiredVM {
         dockerBin: env.DOCKER_BIN ?? 'docker',
       },
     });
-    return { dir, caseFile, store, acquirer, downloader, identifier };
+    const flashReviewer = new FlashReviewer(store, {
+      image: env.FLASH_REVIEW_IMAGE ?? 'nautilus-flash-review:local',
+      dockerBin: env.DOCKER_BIN ?? 'docker',
+    });
+    return { dir, caseFile, store, acquirer, downloader, identifier, flashReviewer };
   };
 
   // The implicit case, active until the agent calls case_open with a topic.
   let active = openCaseBackends(DEFAULT_SLUG, opts.title);
 
   // recon: public sources always; configured ones on demand
-  const recon = new Recon().addSource(new InternetArchiveSource()).addSource(new AhmiaSource());
-  enabled.push('internetarchive', 'ahmia');
-  if (env.SEARXNG_URL) {
-    recon.addSource(new SearXNGSource(env.SEARXNG_URL));
-    enabled.push('searxng');
+  const recon = new Recon()
+    .addSource(new InternetArchiveSource())
+    .addSource(new WikimediaSource({ name: 'wikipedia', baseUrl: env.WIKIPEDIA_URL ?? 'https://en.wikipedia.org', tier: 'surface' }))
+    .addSource(new WikimediaSource({ name: 'wikimedia-commons', baseUrl: 'https://commons.wikimedia.org', tier: 'archive' }))
+    .addSource(new OpenLibrarySource())
+    .addSource(new TvMazeSource())
+    .addSource(new AhmiaSource());
+  enabled.push('internetarchive', 'wikipedia', 'wikimedia-commons', 'openlibrary', 'tvmaze', 'ahmia');
+  const searxngUrl = env.SEARXNG_URL === 'off' ? null : (env.SEARXNG_URL ?? 'http://127.0.0.1:8888');
+  if (searxngUrl) {
+    recon.addSource(
+      new SearXNGSource(searxngUrl, {
+        engines: env.SEARXNG_ENGINES,
+        timeoutMs: env.SEARXNG_TIMEOUT_MS ? Number(env.SEARXNG_TIMEOUT_MS) : 6000,
+      }),
+    );
+    enabled.push(`searxng(${searxngUrl})`);
   }
   if (env.PROWLARR_URL && env.PROWLARR_API_KEY) {
     recon.addSource(new ProwlarrSource(env.PROWLARR_URL, env.PROWLARR_API_KEY));
@@ -150,6 +178,7 @@ export function buildVM(opts: WireOptions): WiredVM {
   if (env.ACOUSTID_KEY) enabled.push('acoustid');
   if (env.REVERSE_IMAGE_URL) enabled.push('reverse-image');
   enabled.push(`audio-match(${env.AUDIO_MATCH_IMAGE ?? 'nautilus-audio-match:local'})`);
+  enabled.push(`flash-review(${env.FLASH_REVIEW_IMAGE ?? 'nautilus-flash-review:local'})`);
 
   // The shared context. The case-bound fields point at whatever case is active;
   // the manager swaps them in place (recon/swarm stay shared across cases).
@@ -161,6 +190,7 @@ export function buildVM(opts: WireOptions): WiredVM {
     recon,
     swarm,
     identifier: active.identifier,
+    flashReviewer: active.flashReviewer,
   };
 
   const bind = (h: CaseBackends): void => {
@@ -169,6 +199,7 @@ export function buildVM(opts: WireOptions): WiredVM {
     ctx.acquirer = h.acquirer;
     ctx.downloader = h.downloader;
     ctx.identifier = h.identifier;
+    ctx.flashReviewer = h.flashReviewer;
   };
   const closeBackends = (h: CaseBackends): void => {
     h.caseFile.close();

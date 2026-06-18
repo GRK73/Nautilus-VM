@@ -1,0 +1,12 @@
+{
+  "name": "@aivm/flash",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Static and isolated runtime review of Flash SWF artifacts.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts"
+  }
+}

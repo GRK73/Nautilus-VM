@@ -369,6 +369,17 @@ audio_match { referenceId, candidateIds[], mode?: 'auto'|'fingerprint'|'features
 
 → `identify_fingerprint`(Chromaprint + 외부 AcoustID 조회)와 상보적: **AcoustID에 없는** 미등록 음원을 *내 코퍼스끼리* 좁히는 게 `audio_match`의 존재 이유다. 실제 Docker 통합 검증은 `npm run test:audio-match`로 실행한다.
 
+### 7.7 `flash_review` — Flash 게임 구조·실행 검토 ⭐ *구현됨*
+
+`flash_review { artifactIds[], mode?: 'static'|'runtime'|'full', timeoutSec? }`는 여러 SWF 후보를 같은 기준으로 일괄 검토한다.
+
+- **정적 검토**: FWS/CWS 헤더와 태그를 안전 제한 내에서 파싱해 버전·압축·stage·FPS·프레임·AS2/AS3·임베디드 자산·외부 URL·위험 API 흔적을 반환한다. ZWS/LZMA와 상세 decompile은 JPEXS 경로로 넘긴다.
+- **동적 검토**: 네트워크가 차단된 Docker 안에서 Ruffle을 Chromium으로 실행하고 제한된 Enter/Space/click smoke input과 시점별 스크린샷·콘솔 로그를 아티팩트로 저장한다. `full`은 JPEXS `-dumpSWF` 결과도 저장한다.
+- **격리**: 입력 read-only, `--network none`, capability 제거, no-new-privileges, CPU/메모리/PID/시간 제한. 외부 리소스 요청은 실행하지 않고 로그로만 남긴다.
+- **판정 한계**: `rendered`/`playable`은 부팅·렌더 smoke 판정이며 게임 완주, 모든 입력 경로, 원본 Flash Player와의 완전 호환을 보장하지 않는다.
+
+실제 Docker 통합 검증은 `npm run test:flash-review`로 실행한다.
+
 ---
 
 ## 8. Perfect Dark / Share — 정직한 해법
@@ -427,6 +438,7 @@ aivm-lm/
 │  ├─ vault/           자격증명 금고(암호화) + 인증/쿠키 세션
 │  ├─ profiles/        ⭐ 도메인 프로파일 (jp-media·western-tv·games config)
 │  ├─ identify/        chromaprint·whisper·역이미지·OCR·ffmpeg 래퍼
+│  ├─ flash/           SWF 정적 파서 + JPEXS/Ruffle 격리 검토
 │  ├─ swarm/           ⭐ 통일 P2P 추상화 + job 매니저
 │  │   ├─ adapters/bt.ts      (qbittorrent-nox WebUI API + bitmagnet 검색)
 │  │   ├─ adapters/ed2k.ts    (amuled EC / amutorrent 재사용)
