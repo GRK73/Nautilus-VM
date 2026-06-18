@@ -48,6 +48,27 @@ export interface FingerprintResult {
   summary: string;
 }
 
+export type AudioMatchMode = 'auto' | 'fingerprint' | 'features';
+
+export interface AudioMatchHit {
+  candidateId: string;
+  method: 'fingerprint' | 'features';
+  /** Method-local score in the 0..1 range. Fingerprint hits always rank first. */
+  score: number;
+  offsetSec?: number;
+  durationSec?: number;
+  summary: string;
+  diagnostics?: Record<string, unknown>;
+}
+
+export interface AudioMatchResult {
+  referenceId: string;
+  mode: AudioMatchMode;
+  compared: number;
+  hits: AudioMatchHit[];
+  summary: string;
+}
+
 export interface TranscriptResult {
   text: string;
   language: string | null;

@@ -6,7 +6,7 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 
 ## The tools
 
-21 core tools + `case_open`/`case_list` (added by the agent/MCP wiring) = 23 in normal use.
+22 core tools + `case_open`/`case_list` (added by the agent/MCP wiring) = 24 in normal use.
 
 ### Memory — the case file (external brain)
 - `case_open {topic}` → pick the folder this investigation lives in. **Call this FIRST.** The SAME topic reuses its existing folder (and resumes its memory); a NEW topic starts a fresh, isolated case — so separate hunts never read each other's leads. Returns `{ reused, slug, digest }`.
@@ -34,6 +34,7 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 ### Identify — binary → text clue
 - `identify_probe {artifactId}` → ffprobe metadata (duration, codecs, dimensions).
 - `identify_fingerprint {artifactId}` → chromaprint + AcoustID lookup → matches. **The lostwave workhorse.**
+- `audio_match {referenceId, candidateIds[], mode?, topK?}` → exact landmark matches first, then fuzzy chroma/MFCC subsequence DTW for misses. Scores are method-labelled and include offsets.
 - `identify_transcribe {artifactId, language?}` → speech → text (whisper).
 - `identify_ocr {artifactId, lang?}` → text out of an image (tesseract).
 - `identify_frames {artifactId, everySec?, limit?}` → extract video keyframes as new image artifacts (then OCR / reverse-search them).
@@ -55,7 +56,7 @@ Notes:
 - **Verify before calling**: `Identifier.available(tool)` (`which`/`where` probe) tells you whether a binary is on PATH without running it. The runtime tools just attempt and surface the install hint on failure.
 - **Custom paths**: pass `bins: { fpcalc: 'C:\\tools\\fpcalc.exe', whisper: 'whisper-cli', … }` to the `Identifier` constructor to point at non-PATH installs.
 - **`identify_fingerprint` without `ACOUSTID_KEY`** still returns the raw chromaprint fingerprint + duration (useful for local A/B comparison); it just can't name the track via AcoustID.
-- **lostwave end-to-end**: `download`/`p2p_download` the candidate → `identify_fingerprint` (needs `fpcalc`) → attach the match as `case_evidence_attach`. A planned `audio_match` tool (bulk-compare a reference clip against many downloaded candidates) is designed in `VM_design.md §7.6`.
+- **lostwave end-to-end**: `download`/`p2p_download` candidates → `identify_fingerprint` for external identification or `audio_match` for local corpus comparison → attach the match as `case_evidence_attach`. Build the matcher image with `docker build -t nautilus-audio-match:local tools/audio-match` first.
 
 ## Domain profiles
 

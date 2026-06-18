@@ -40,20 +40,20 @@ Everything bulky (a web page, a torrent, a video) is stored **once**, content-ad
 
 ## The tools
 
-21 core tools, plus `case_open` / `case_list` added by the agent/MCP wiring (per-case folders — see below) for **23** in normal use.
+22 core tools, plus `case_open` / `case_list` added by the agent/MCP wiring (per-case folders — see below) for **24** in normal use.
 
 | Group | Tools |
 |---|---|
 | **Memory** (the external brain) | `case_open` (pick/resume this hunt's folder — call first) · `case_list` (existing cases) · `case_digest` (resume) · `case_report` · `case_lead_add` · `case_lead_update` · `case_evidence_attach` · `case_deadend` (auto-marks the lead dead) · `case_search` (FTS) |
 | **Find** | `discover(query, scope)` — fans across **surface / archive / deep / dark** at once, returns unified candidates + per-source coverage · `fetch(url)` (cached; `.onion` routes through Tor) · `archive_lookup(url)` (Wayback) · `read_artifact(id)` (ranged drill-down) |
 | **Acquire** | `download(url)` (HTTP stream / yt-dlp) · `p2p_search` (seeders + health) · `p2p_download` (magnet/ed2k → async job) · `p2p_jobs` |
-| **Identify** (binary → text clue) | `identify_fingerprint` (chromaprint + AcoustID — *lostwave*) · `identify_transcribe` (whisper) · `identify_ocr` (tesseract) · `identify_probe` (ffprobe) · `identify_frames` (video → keyframes) · `image_reverse` |
+| **Identify** (binary → text clue) | `identify_fingerprint` (chromaprint + AcoustID — *lostwave*) · `audio_match` (reference clip ↔ local candidate corpus) · `identify_transcribe` (whisper) · `identify_ocr` (tesseract) · `identify_probe` (ffprobe) · `identify_frames` (video → keyframes) · `image_reverse` |
 
 ---
 
 ## Packages
 
-A TypeScript monorepo — **9 packages + 2 apps**, **91 tests** passing.
+A TypeScript monorepo — **9 packages + 2 apps**, **95 tests** passing, plus a Docker audio-matcher integration test.
 
 | Module | What |
 |---|---|
@@ -92,6 +92,12 @@ npm run demo:casefile    # the external-brain mechanics (lostwave)
 npm run demo:identify    # mystery clip → probe/fingerprint/transcribe → evidence
 npm run demo:recon       # discover → fetch → artifact → case-file evidence
 npm run demo:swarm       # P2P: search by health → async download → poll
+```
+
+Build the optional isolated audio matcher before the first `audio_match` call:
+
+```bash
+docker build -t nautilus-audio-match:local tools/audio-match
 ```
 
 ---
@@ -163,6 +169,7 @@ Works with just an API key + internet (Internet Archive, Ahmia listing, `fetch`/
 | `AMULE_PASSWORD` (+ `AMULE_HOST`, `AMULE_DOCKER_CONTAINER`) | eD2k/Kad via amuled |
 | `ACOUSTID_KEY` | Audio fingerprint lookups (lostwave) |
 | `REVERSE_IMAGE_URL` | Reverse image search backend |
+| `AUDIO_MATCH_IMAGE` | Corpus audio matcher image (default `nautilus-audio-match:local`) |
 | `TOR_SOCKS_HOST` / `TOR_SOCKS_PORT` | Tor gateway for `.onion` (default `127.0.0.1:9050`) |
 
 ---
@@ -225,6 +232,7 @@ Everything in the TypeScript core runs with just **Node 24** (`npm install` pull
 | **whisper** (`whisper-cli` or `openai-whisper`) | `identify_transcribe` | whisper.cpp build, or `pip install openai-whisper` |
 | **tesseract** | `identify_ocr` | `winget install UB-Mannheim.TesseractOCR` / `brew install tesseract` |
 | **yt-dlp** | `download` of site-embedded media | `winget install yt-dlp.yt-dlp` / `pip install yt-dlp` |
+| **Docker audio matcher** | `audio_match` local-corpus comparison | `docker build -t nautilus-audio-match:local tools/audio-match` |
 
 **API keys (env):** `ANTHROPIC_API_KEY` for the bundled agent; `ACOUSTID_KEY` for AcoustID fingerprint lookups. The optional source backends in the env table above (SearXNG / Prowlarr / bitmagnet / qBittorrent / aMule / Tor) are also operator-provided — the Docker stack in `deploy/` brings up the ones it can.
 

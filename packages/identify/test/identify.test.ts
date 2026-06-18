@@ -69,6 +69,52 @@ test('fingerprint without a key returns the fp and no matches', async () => {
   }
 });
 
+test('audioMatch validates artifacts and maps the Docker sidecar response', async () => {
+  const { store, id: referenceId, dir } = storeWithBlob();
+  const candidate = store.put({ data: Buffer.from('different fake media bytes'), mime: 'audio/mpeg', kind: 'audio' });
+  const runner = new FakeRunner();
+  runner.byBin['docker'] = {
+    status: 0,
+    stdout: JSON.stringify({
+      referenceId,
+      mode: 'auto',
+      compared: 1,
+      hits: [{ candidateId: candidate.id, method: 'fingerprint', score: 0.9, offsetSec: 12.5, summary: 'exact' }],
+      summary: 'compared 1 candidate(s)',
+    }),
+    stderr: '',
+  };
+  try {
+    const result = await new Identifier(store, { runner }).audioMatch(referenceId, [candidate.id], { topK: 1 });
+    assert.equal(result.compared, 1);
+    assert.equal(result.hits[0]!.candidateId, candidate.id);
+    assert.equal(result.hits[0]!.offsetSec, 12.5);
+    const call = runner.calls[0]!;
+    assert.equal(call.bin, 'docker');
+    assert.ok(call.args.includes('--network') && call.args.includes('none'));
+    assert.ok(call.args.includes('nautilus-audio-match:local'));
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('audioMatch reports an actionable image build error', async () => {
+  const { store, id: referenceId, dir } = storeWithBlob();
+  const candidate = store.put({ data: Buffer.from('candidate'), mime: 'audio/mpeg', kind: 'audio' });
+  const runner = new FakeRunner();
+  runner.byBin['docker'] = { status: 125, stdout: '', stderr: 'image not found' };
+  try {
+    await assert.rejects(
+      () => new Identifier(store, { runner }).audioMatch(referenceId, [candidate.id]),
+      /audio_match unavailable.*docker build -t nautilus-audio-match:local tools\/audio-match/,
+    );
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('fingerprint with a key resolves AcoustID matches (lostwave)', async () => {
   const { store, id, dir } = storeWithBlob();
   const acoustid: { server: Server; base: string } = await new Promise((resolve) => {

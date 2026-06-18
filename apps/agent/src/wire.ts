@@ -92,7 +92,14 @@ export function buildVM(opts: WireOptions): WiredVM {
       },
     });
     const downloader = new Downloader(store);
-    const identifier = new Identifier(store, { acoustidKey: env.ACOUSTID_KEY, reverseImageProvider });
+    const identifier = new Identifier(store, {
+      acoustidKey: env.ACOUSTID_KEY,
+      reverseImageProvider,
+      audioMatch: {
+        image: env.AUDIO_MATCH_IMAGE ?? 'nautilus-audio-match:local',
+        dockerBin: env.DOCKER_BIN ?? 'docker',
+      },
+    });
     return { dir, caseFile, store, acquirer, downloader, identifier };
   };
 
@@ -142,6 +149,7 @@ export function buildVM(opts: WireOptions): WiredVM {
 
   if (env.ACOUSTID_KEY) enabled.push('acoustid');
   if (env.REVERSE_IMAGE_URL) enabled.push('reverse-image');
+  enabled.push(`audio-match(${env.AUDIO_MATCH_IMAGE ?? 'nautilus-audio-match:local'})`);
 
   // The shared context. The case-bound fields point at whatever case is active;
   // the manager swaps them in place (recon/swarm stay shared across cases).

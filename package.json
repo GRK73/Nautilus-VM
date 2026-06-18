@@ -21,6 +21,7 @@
     "demo:swarm": "node --disable-warning=ExperimentalWarning packages/swarm/examples/demo.ts",
     "demo:identify": "node --disable-warning=ExperimentalWarning packages/identify/examples/demo.ts",
     "demo:runtime": "node --disable-warning=ExperimentalWarning packages/runtime/examples/demo.ts",
+    "test:audio-match": "node --disable-warning=ExperimentalWarning tools/audio-match/integration.ts",
     "agent": "node --disable-warning=ExperimentalWarning apps/agent/src/cli.ts",
     "mcp": "node --disable-warning=ExperimentalWarning apps/mcp/src/stdio.ts"
   },

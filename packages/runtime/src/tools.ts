@@ -8,6 +8,7 @@ const obj = (properties: Record<string, unknown>, required: string[] = []): JSON
 
 const str = (description: string) => ({ type: 'string', description });
 const num = (description: string) => ({ type: 'number', description });
+const strArray = (description: string) => ({ type: 'array', items: { type: 'string' }, description });
 
 /**
  * Build the full tool surface from wired components. These are the only verbs
@@ -156,6 +157,21 @@ export function buildTools(ctx: ToolContext): Tool[] {
       description: 'Audio fingerprint + AcoustID lookup for an unknown recording (lostwave).',
       inputSchema: obj({ artifactId: str('audio artifact id') }, ['artifactId']),
       handler: async (a) => ctx.identifier.fingerprint(a.artifactId),
+    },
+    {
+      name: 'audio_match',
+      description:
+        'Compare one reference audio artifact against local candidate artifacts. Exact landmark fingerprint hits rank first; misses use fuzzy chroma/MFCC subsequence DTW. Returns method-labelled scores and offsets.',
+      inputSchema: obj(
+        {
+          referenceId: str('short reference audio artifact id'),
+          candidateIds: strArray('candidate audio artifact ids, up to 500'),
+          mode: str('auto|fingerprint|features; default auto'),
+          topK: num('maximum ranked results; default 10'),
+        },
+        ['referenceId', 'candidateIds'],
+      ),
+      handler: async (a) => ctx.identifier.audioMatch(a.referenceId, a.candidateIds, { mode: a.mode, topK: a.topK }),
     },
     {
       name: 'identify_transcribe',

@@ -2,7 +2,7 @@
   "name": "@aivm/identify",
   "version": "0.0.0",
   "type": "module",
-  "description": "Turn binary artifacts into text clues: ffprobe, audio fingerprint (chromaprint+AcoustID), transcription, OCR.",
+  "description": "Turn binary artifacts into clues: media probe, fingerprinting, corpus audio matching, transcription, and OCR.",
   "exports": {
     ".": "./src/index.ts"
   },

@@ -1,11 +1,13 @@
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { ArtifactStore } from '../../artifacts/src/index.ts';
 import type { Artifact } from '../../artifacts/src/index.ts';
 import { defaultRunner, which } from './runner.ts';
 import type {
   AcoustIDMatch,
+  AudioMatchMode,
+  AudioMatchResult,
   FingerprintResult,
   MediaInfo,
   OcrResult,
@@ -35,6 +37,12 @@ export interface IdentifyOptions {
   bins?: Partial<Record<ToolName, string>>;
   /** Backend for reverse image search (none = image_reverse errors with guidance). */
   reverseImageProvider?: ReverseImageProvider;
+  /** Docker-backed corpus matcher. The image is built from tools/audio-match. */
+  audioMatch?: {
+    image?: string;
+    dockerBin?: string;
+    cacheDir?: string;
+  };
 }
 
 export interface ReverseImageOptions {
@@ -56,6 +64,11 @@ export interface FramesOptions {
   everySec?: number;
   /** Max frames to extract. Default 12. */
   limit?: number;
+}
+
+export interface AudioMatchOptions {
+  mode?: AudioMatchMode;
+  topK?: number;
 }
 
 interface FfStream {
@@ -90,12 +103,18 @@ export class Identifier {
   #acoustidBase: string;
   #bins: Record<ToolName, string>;
   #reverseProvider: ReverseImageProvider | undefined;
+  #audioMatchImage: string;
+  #audioMatchDockerBin: string;
+  #audioMatchCacheDir: string;
 
   constructor(store: ArtifactStore, opts: IdentifyOptions = {}) {
     this.#store = store;
     this.#runner = opts.runner ?? defaultRunner;
     this.#acoustidKey = opts.acoustidKey;
     this.#reverseProvider = opts.reverseImageProvider;
+    this.#audioMatchImage = opts.audioMatch?.image ?? 'nautilus-audio-match:local';
+    this.#audioMatchDockerBin = opts.audioMatch?.dockerBin ?? 'docker';
+    this.#audioMatchCacheDir = opts.audioMatch?.cacheDir ?? join(store.root, '.audio-match-cache');
     this.#acoustidBase = (opts.acoustidBase ?? 'https://api.acoustid.org').replace(/\/+$/, '');
     this.#bins = {
       ffprobe: opts.bins?.ffprobe ?? 'ffprobe',
@@ -104,6 +123,71 @@ export class Identifier {
       whisper: opts.bins?.whisper ?? 'whisper-cli',
       tesseract: opts.bins?.tesseract ?? 'tesseract',
     };
+  }
+
+  /** Compare one reference clip against a local corpus in an isolated container. */
+  async audioMatch(referenceId: string, candidateIds: string[], opts: AudioMatchOptions = {}): Promise<AudioMatchResult> {
+    if (typeof referenceId !== 'string' || referenceId.length === 0) throw new Error('audio_match requires a referenceId');
+    if (!Array.isArray(candidateIds) || candidateIds.some((id) => typeof id !== 'string')) {
+      throw new Error('audio_match candidateIds must be an array of artifact ids');
+    }
+    if (!this.#store.has(referenceId)) throw new Error(`unknown reference artifact: ${referenceId}`);
+    const uniqueCandidates = [...new Set(candidateIds)].filter((id) => id !== referenceId);
+    if (uniqueCandidates.length === 0) throw new Error('audio_match requires at least one candidate artifact distinct from the reference');
+    if (uniqueCandidates.length > 500) throw new Error('audio_match accepts at most 500 candidates per call');
+    for (const id of uniqueCandidates) {
+      if (!this.#store.has(id)) throw new Error(`unknown candidate artifact: ${id}`);
+    }
+
+    const mode = opts.mode ?? 'auto';
+    if (!['auto', 'fingerprint', 'features'].includes(mode)) throw new Error(`invalid audio_match mode: ${mode}`);
+    if (opts.topK !== undefined && (!Number.isInteger(opts.topK) || opts.topK < 1)) throw new Error('audio_match topK must be a positive integer');
+    const topK = Math.max(1, Math.min(opts.topK ?? 10, uniqueCandidates.length));
+    mkdirSync(this.#audioMatchCacheDir, { recursive: true });
+    const requestDir = mkdtempSync(join(tmpdir(), 'aivm_audio_match_'));
+    try {
+      const inContainer = (id: string): string => {
+        const rel = relative(this.#store.root, this.#store.path(id));
+        if (rel.startsWith('..') || rel === '') throw new Error(`artifact path escaped store root: ${id}`);
+        return `/artifacts/${rel.split(sep).join('/')}`;
+      };
+      const manifest = {
+        reference: { id: referenceId, path: inContainer(referenceId) },
+        candidates: uniqueCandidates.map((id) => ({ id, path: inContainer(id) })),
+        mode,
+        topK,
+        cacheDir: '/cache',
+      };
+      writeFileSync(join(requestDir, 'request.json'), JSON.stringify(manifest), 'utf8');
+      const args = [
+        'run',
+        '--rm',
+        '--network',
+        'none',
+        '-v',
+        `${this.#store.root}:/artifacts:ro`,
+        '-v',
+        `${this.#audioMatchCacheDir}:/cache`,
+        '-v',
+        `${requestDir}:/request:ro`,
+        this.#audioMatchImage,
+        '--manifest',
+        '/request/request.json',
+      ];
+      const res = await this.#runner.run(this.#audioMatchDockerBin, args);
+      if (res.status !== 0) {
+        const detail = (res.stderr || res.stdout).trim().slice(-500);
+        throw new Error(
+          `audio_match unavailable (${this.#audioMatchDockerBin}, exit ${res.status}): ${detail}. ` +
+            `Build it with: docker build -t ${this.#audioMatchImage} tools/audio-match`,
+        );
+      }
+      const parsed = JSON.parse(res.stdout) as AudioMatchResult;
+      if (!Array.isArray(parsed.hits) || parsed.referenceId !== referenceId) throw new Error('audio_match returned an invalid response');
+      return parsed;
+    } finally {
+      rmSync(requestDir, { recursive: true, force: true });
+    }
   }
 
   available(tool: ToolName): boolean {

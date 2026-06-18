@@ -106,7 +106,9 @@ test('exposes Anthropic-shaped tool definitions', async () => {
   try {
     const tools = c.vm.toAnthropicTools();
     const names = tools.map((t) => t.name);
-    assert.ok(names.includes('discover') && names.includes('case_digest') && names.includes('identify_fingerprint'));
+    assert.ok(names.includes('discover') && names.includes('case_digest') && names.includes('identify_fingerprint') && names.includes('audio_match'));
+    const audioMatch = tools.find((t) => t.name === 'audio_match')!;
+    assert.deepEqual(audioMatch.input_schema.required, ['referenceId', 'candidateIds']);
     const fetchTool = tools.find((t) => t.name === 'fetch')!;
     assert.equal(fetchTool.input_schema.type, 'object');
     assert.deepEqual(fetchTool.input_schema.required, ['url']);
