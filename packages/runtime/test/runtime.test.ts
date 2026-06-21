@@ -14,6 +14,7 @@ import { Swarm, toMagnet } from '../../swarm/src/index.ts';
 import type { AddOptions, Network, SwarmAdapter, SwarmJob } from '../../swarm/src/index.ts';
 import { Identifier } from '../../identify/src/index.ts';
 import { FlashReviewer } from '../../flash/src/index.ts';
+import { ExecutableReviewer } from '../../executable/src/index.ts';
 import type { ToolResult, ToolRunner } from '../../identify/src/index.ts';
 import { Nautilus } from '../src/index.ts';
 
@@ -87,8 +88,9 @@ async function build(): Promise<Ctx> {
   const swarm = new Swarm().register(new FakeBt());
   const identifier = new Identifier(store, { runner: fakeRunner });
   const flashReviewer = new FlashReviewer(store);
+  const executableReviewer = new ExecutableReviewer(store);
 
-  const vm = new Nautilus({ caseFile, store, acquirer, downloader, recon, swarm, identifier, flashReviewer });
+  const vm = new Nautilus({ caseFile, store, acquirer, downloader, recon, swarm, identifier, flashReviewer, executableReviewer });
   return {
     vm,
     base,
@@ -108,7 +110,7 @@ test('exposes Anthropic-shaped tool definitions', async () => {
   try {
     const tools = c.vm.toAnthropicTools();
     const names = tools.map((t) => t.name);
-    assert.ok(names.includes('discover') && names.includes('case_digest') && names.includes('identify_fingerprint') && names.includes('audio_match') && names.includes('flash_review'));
+    assert.ok(names.includes('discover') && names.includes('case_digest') && names.includes('identify_fingerprint') && names.includes('audio_match') && names.includes('flash_review') && names.includes('executable_review'));
     const audioMatch = tools.find((t) => t.name === 'audio_match')!;
     assert.deepEqual(audioMatch.input_schema.required, ['referenceId', 'candidateIds']);
     const fetchTool = tools.find((t) => t.name === 'fetch')!;

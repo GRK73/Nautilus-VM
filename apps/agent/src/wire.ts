@@ -20,6 +20,8 @@ import { Swarm, QBittorrentAdapter, AmuleAdapter } from '../../../packages/swarm
 import type { CommandRunner } from '../../../packages/swarm/src/index.ts';
 import { Identifier, HttpReverseImageProvider } from '../../../packages/identify/src/index.ts';
 import { FlashReviewer } from '../../../packages/flash/src/index.ts';
+import { ExecutableReviewer } from '../../../packages/executable/src/index.ts';
+import { fileURLToPath } from 'node:url';
 import { TorClient } from '../../../packages/tor/src/index.ts';
 import { Nautilus } from '../../../packages/runtime/src/index.ts';
 import type { CaseInfo, CaseManager, CaseOpenResult, ToolContext } from '../../../packages/runtime/src/index.ts';
@@ -47,6 +49,7 @@ interface CaseBackends {
   downloader: Downloader;
   identifier: Identifier;
   flashReviewer: FlashReviewer;
+  executableReviewer: ExecutableReviewer;
 }
 
 /** Slug for the implicit case used before the agent calls case_open. */
@@ -116,7 +119,15 @@ export function buildVM(opts: WireOptions): WiredVM {
       image: env.FLASH_REVIEW_IMAGE ?? 'nautilus-flash-review:local',
       dockerBin: env.DOCKER_BIN ?? 'docker',
     });
-    return { dir, caseFile, store, acquirer, downloader, identifier, flashReviewer };
+    const executableReviewer = new ExecutableReviewer(store, {
+      dockerBin: env.DOCKER_BIN ?? 'docker',
+      staticImage: env.EXECUTABLE_STATIC_IMAGE ?? 'nautilus-executable-static:local',
+      dosImage: env.EXECUTABLE_DOS_IMAGE ?? 'nautilus-executable-dos:local',
+      linuxImage: env.EXECUTABLE_LINUX_IMAGE ?? 'nautilus-executable-linux:local',
+      windowsScript: env.EXECUTABLE_WINDOWS_SCRIPT ?? fileURLToPath(new URL('../../../workers/windows-review/Invoke-NautilusReview.ps1', import.meta.url)),
+      flashReviewer,
+    });
+    return { dir, caseFile, store, acquirer, downloader, identifier, flashReviewer, executableReviewer };
   };
 
   // The implicit case, active until the agent calls case_open with a topic.
@@ -179,6 +190,7 @@ export function buildVM(opts: WireOptions): WiredVM {
   if (env.REVERSE_IMAGE_URL) enabled.push('reverse-image');
   enabled.push(`audio-match(${env.AUDIO_MATCH_IMAGE ?? 'nautilus-audio-match:local'})`);
   enabled.push(`flash-review(${env.FLASH_REVIEW_IMAGE ?? 'nautilus-flash-review:local'})`);
+  enabled.push(`executable-review(${env.EXECUTABLE_STATIC_IMAGE ?? 'nautilus-executable-static:local'})`);
 
   // The shared context. The case-bound fields point at whatever case is active;
   // the manager swaps them in place (recon/swarm stay shared across cases).
@@ -191,6 +203,7 @@ export function buildVM(opts: WireOptions): WiredVM {
     swarm,
     identifier: active.identifier,
     flashReviewer: active.flashReviewer,
+    executableReviewer: active.executableReviewer,
   };
 
   const bind = (h: CaseBackends): void => {
@@ -200,6 +213,7 @@ export function buildVM(opts: WireOptions): WiredVM {
     ctx.downloader = h.downloader;
     ctx.identifier = h.identifier;
     ctx.flashReviewer = h.flashReviewer;
+    ctx.executableReviewer = h.executableReviewer;
   };
   const closeBackends = (h: CaseBackends): void => {
     h.caseFile.close();

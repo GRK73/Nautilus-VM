@@ -382,6 +382,19 @@ audio_match { referenceId, candidateIds[], mode?: 'auto'|'fingerprint'|'features
 
 ---
 
+### 7.8 `executable_review` — 실행 파일 정적·격리 검토 ⭐ *구현됨*
+
+`executable_review { artifactIds[], mode?: 'static'|'sandbox', platform?: 'auto'|'windows'|'linux'|'dos', timeoutSec?, allowExecution? }`는 후보 실행 파일을 먼저 정적으로 분류하고, 명시적 승인 때만 격리 워커에서 관찰한다.
+
+- **정적 기본 경로:** Node 네이티브 파서가 PE/ELF/Mach-O/DOS/스크립트, 아키텍처, 엔트로피, URL, 위험 API, 내장 SWF 위치를 즉시 판별한다. 네트워크 없는 read-only Docker 사이드카가 LIEF, YARA, capa, FLOSS 결과와 JSON 보고서를 만든다.
+- **Flash 연계:** 실행 파일에서 검증된 FWS/CWS를 추출해 Artifact Store에 넣고 `flash_review(mode:'static')` 결과를 같은 항목에 붙인다.
+- **DOS:** 네트워크 없는 DOSBox+Xvfb 컨테이너에서 실행하고 화면, 로그, 생성 파일을 artifact로 회수한다.
+- **Linux:** Docker에 등록된 gVisor `runsc` 런타임에서만 실행한다. 일반 `runc`로의 폴백은 금지한다.
+- **Windows:** Hyper-V PowerShell Direct 워커가 전용 게스트의 네트워크를 끊고 `NautilusClean` 체크포인트를 실행 전후 복원한다.
+- **강제 안전 계약:** `sandbox`는 `allowExecution:true` 없이는 거부하고 직접 네트워크를 항상 금지한다. 해당 격리 워커가 없으면 `unavailable`을 반환하며 호스트에서는 절대 실행하지 않는다.
+
+구현 위치: `packages/executable/`, `tools/executable-static/`, `tools/executable-dos/`, `tools/executable-linux/`, `workers/windows-review/`. 실제 도구 경로의 통합 검증은 `npm run test:executable-review`가 담당한다.
+
 ## 8. Perfect Dark / Share — 정직한 해법
 
 제어 API가 **존재하지 않는다** (폐쇄 소스·Windows 전용·고암호화). 둘 중 하나:

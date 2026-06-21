@@ -1,12 +1,12 @@
 # The Nautilus-VM — tool surface & operation
 
-The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\ggori\OneDrive\Desktop\Projects모음\AIVM-PJ` (repo `Nautilus-VM`, https://github.com/GRK73/Nautilus-VM). TypeScript / Node 24, `node:sqlite`, zero runtime dependencies. 9 packages + 2 apps, 91 tests.
+The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\ggori\OneDrive\Desktop\Projects모음\AIVM-PJ` (repo `Nautilus-VM`, https://github.com/GRK73/Nautilus-VM). TypeScript / Node 24, `node:sqlite`, zero core runtime dependencies. 11 packages + 2 apps.
 
 **Design philosophy: "the VM remembers, the agent only decides."** Big things (web pages, media, P2P files) are stored once, content-addressed by sha256, and surfaced as `{ id, summary }` — never paste raw payloads into context; pull bytes with `read_artifact` / `identify_*` only when needed.
 
 ## The tools
 
-23 core tools + `case_open`/`case_list` (added by the agent/MCP wiring) = 25 in normal use.
+24 core tools + `case_open`/`case_list` (added by the agent/MCP wiring) = 26 in normal use.
 
 ### Memory — the case file (external brain)
 - `case_open {topic}` → pick the folder this investigation lives in. **Call this FIRST.** The SAME topic reuses its existing folder (and resumes its memory); a NEW topic starts a fresh, isolated case — so separate hunts never read each other's leads. Returns `{ reused, slug, digest }`.
@@ -36,6 +36,7 @@ The lost-media methodology, built as a tool-driven agent VM. Source: `C:\Users\g
 - `identify_fingerprint {artifactId}` → chromaprint + AcoustID lookup → matches. **The lostwave workhorse.**
 - `audio_match {referenceId, candidateIds[], mode?, topK?}` → exact landmark matches first, then fuzzy chroma/MFCC subsequence DTW for misses. Scores are method-labelled and include offsets.
 - `flash_review {artifactIds[], mode?, timeoutSec?}` → static SWF structure/risk review; `runtime`/`full` adds isolated Ruffle screenshots and `full` adds a JPEXS dump. A rendered smoke test is not proof that a game can be completed.
+- `executable_review {artifactIds[], mode?, platform?, timeoutSec?, allowExecution?}` → static PE/ELF/Mach-O/DOS structure plus LIEF/YARA/capa/FLOSS. Embedded SWFs are extracted into artifacts and reviewed as Flash. `sandbox` requires `allowExecution:true`, forbids networking, and uses only DOSBox, Docker `runsc` (gVisor), or a resettable Hyper-V guest; there is no host or `runc` fallback.
 - `identify_transcribe {artifactId, language?}` → speech → text (whisper).
 - `identify_ocr {artifactId, lang?}` → text out of an image (tesseract).
 - `identify_frames {artifactId, everySec?, limit?}` → extract video keyframes as new image artifacts (then OCR / reverse-search them).
@@ -102,6 +103,8 @@ Both the agent and MCP server work with just internet for Wikipedia, Commons, Op
 - `ACOUSTID_KEY` — audio fingerprint lookups (lostwave)
 - `REVERSE_IMAGE_URL` — a self-hosted/proxy reverse-image backend
 - `TOR_SOCKS_HOST` / `TOR_SOCKS_PORT` — Tor gateway for `.onion` (default `127.0.0.1:9050`)
+- `EXECUTABLE_STATIC_IMAGE`, `EXECUTABLE_DOS_IMAGE`, `EXECUTABLE_LINUX_IMAGE` — executable-review images
+- `NAUTILUS_WINDOWS_REVIEW_VM` (+ `_USER` / `_PASSWORD`) — isolated Hyper-V review guest
 
 ### P2P backends run in containers (the sandbox layer)
 
@@ -112,3 +115,4 @@ The heavy daemons (Tor, qBittorrent, amuled, bitmagnet) run in **Docker containe
 - **Perfect Dark / Share** have no control API (closed, Windows-only); they plug in later as GUI-automation adapters behind the same interface. For now, eD2k (amuled) + BitTorrent are the live P2P networks.
 - **Dark web** is reachable (Tor) but low-yield for genuine lost media — keep the hoax skepticism from Step 0.
 - Tools degrade gracefully: if an external binary/daemon/service isn't installed, the tool returns a structured error telling you what to install or to use the `vm.exec` escape hatch — read it and adapt rather than giving up.
+- Never use `vm.exec` or the host as a fallback for an untrusted executable. An unavailable executable worker is a safety stop.

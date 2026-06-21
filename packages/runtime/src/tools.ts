@@ -218,5 +218,27 @@ export function buildTools(ctx: ToolContext): Tool[] {
           },
         ]
       : []),
+    ...(ctx.executableReviewer
+      ? [
+          {
+            name: 'executable_review',
+            description:
+              'Batch-review PE/ELF/Mach-O/DOS executable artifacts. Static mode uses native parsing plus isolated LIEF/YARA/capa/FLOSS analysis and extracts embedded SWFs. Sandbox mode requires allowExecution:true and only uses a configured DOSBox, Hyper-V, or gVisor worker; it never executes on the host or enables network.',
+            inputSchema: obj(
+              {
+                artifactIds: strArray('executable artifact ids, up to 25'),
+                mode: str('static|sandbox; default static'),
+                platform: str('auto|windows|linux|macos|dos; default auto'),
+                timeoutSec: num('sandbox duration, 2..120 seconds; default 15'),
+                allowExecution: { type: 'boolean', description: 'must be true for sandbox mode' },
+              },
+              ['artifactIds'],
+            ),
+            handler: async (a: Record<string, any>) => ctx.executableReviewer!.review(a.artifactIds, {
+              mode: a.mode, platform: a.platform, timeoutSec: a.timeoutSec, allowExecution: a.allowExecution, allowNetwork: false,
+            }),
+          },
+        ]
+      : []),
   ];
 }

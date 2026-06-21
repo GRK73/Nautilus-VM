@@ -40,7 +40,7 @@ Everything bulky (a web page, a torrent, a video) is stored **once**, content-ad
 
 ## The tools
 
-23 core tools, plus `case_open` / `case_list` added by the agent/MCP wiring (per-case folders — see below) for **25** in normal use.
+24 core tools, plus `case_open` / `case_list` added by the agent/MCP wiring (per-case folders — see below) for **26** in normal use.
 
 | Group | Tools |
 |---|---|
@@ -49,12 +49,13 @@ Everything bulky (a web page, a torrent, a video) is stored **once**, content-ad
 | **Acquire** | `download(url)` (HTTP stream / yt-dlp) · `p2p_search` (seeders + health) · `p2p_download` (magnet/ed2k → async job) · `p2p_jobs` |
 | **Identify** (binary → text clue) | `identify_fingerprint` (chromaprint + AcoustID — *lostwave*) · `audio_match` (reference clip ↔ local candidate corpus) · `identify_transcribe` (whisper) · `identify_ocr` (tesseract) · `identify_probe` (ffprobe) · `identify_frames` (video → keyframes) · `image_reverse` |
 | **Flash review** | `flash_review` — batch SWF metadata/tag/asset/risk analysis; optional isolated JPEXS dump + Ruffle render/input smoke test with screenshot artifacts |
+| **Executable review** | `executable_review` — native PE/ELF/Mach-O/DOS inspection plus containerized LIEF/YARA/capa/FLOSS; explicit sandbox mode routes only to DOSBox, gVisor, or a resettable Hyper-V guest |
 
 ---
 
 ## Packages
 
-A TypeScript monorepo — **10 packages + 2 apps**, with Docker integration tests for audio matching and Flash review.
+A TypeScript monorepo — **11 packages + 2 apps**, with Docker integration tests for audio matching, Flash review, and executable review.
 
 | Module | What |
 |---|---|
@@ -65,6 +66,7 @@ A TypeScript monorepo — **10 packages + 2 apps**, with Docker integration test
 | `@aivm/swarm` | Unified job-based P2P — qBittorrent (BT) + amuled (eD2k/Kad) adapters, URI routing (magnet→bt, ed2k→ed2k), search-by-health. |
 | `@aivm/identify` | Binary → text clue: ffprobe, audio fingerprint, transcribe, OCR, video keyframes, reverse image. Injectable tool runner → testable with no binaries. |
 | `@aivm/flash` | Safe FWS/CWS parsing plus isolated JPEXS/Ruffle batch review. Captures metadata, ActionScript generation, assets, URLs, risk flags, screenshots, and diagnostics. |
+| `@aivm/executable` | Static executable parsing/scanning and isolated DOS/Windows/Linux worker orchestration. Embedded SWFs are extracted and passed to `@aivm/flash`. Never falls back to host execution. |
 | `@aivm/tor` | Zero-dependency Tor SOCKS5 gateway (hand-rolled SOCKS5 + TLS + HTTP/chunked). `fetch` routes `.onion` through it transparently. |
 | `@aivm/profiles` | Domain profiles (`jp_media` / `western_tv` / `games`): source & network priority, identify defaults, agent guidance. |
 | `@aivm/runtime` | **The VM surface** — wires every package into the tool surface and dispatches calls. `toAnthropicTools()` + `call()`. |
@@ -85,7 +87,7 @@ A TypeScript monorepo — **10 packages + 2 apps**, with Docker integration test
 
 ```bash
 npm install            # dev deps only (typescript, @types/node)
-npm test               # 103 tests, all packages (node --test auto-discovers)
+npm test               # 108 tests, all packages (node --test auto-discovers)
 npm run typecheck      # tsc, per package
 
 # self-contained demos (no external services / API key)
@@ -104,6 +106,11 @@ npm run test:audio-match
 
 docker build -t nautilus-flash-review:local tools/flash-review
 npm run test:flash-review
+
+docker build -t nautilus-executable-static:local tools/executable-static
+docker build -t nautilus-executable-dos:local tools/executable-dos
+docker build -t nautilus-executable-linux:local tools/executable-linux
+npm run test:executable-review
 ```
 
 ---
@@ -184,6 +191,11 @@ Works with just an API key + internet: Wikipedia, Wikimedia Commons, Open Librar
 | `REVERSE_IMAGE_URL` | Reverse image search backend |
 | `AUDIO_MATCH_IMAGE` | Corpus audio matcher image (default `nautilus-audio-match:local`) |
 | `FLASH_REVIEW_IMAGE` | JPEXS + Ruffle review image (default `nautilus-flash-review:local`) |
+| `EXECUTABLE_STATIC_IMAGE` | LIEF/YARA/capa/FLOSS scanner image |
+| `EXECUTABLE_DOS_IMAGE` | DOSBox worker image |
+| `EXECUTABLE_LINUX_IMAGE` | Linux worker image; used only with Docker `runsc` |
+| `EXECUTABLE_WINDOWS_SCRIPT` | Hyper-V worker script override |
+| `NAUTILUS_WINDOWS_REVIEW_VM` (+ `_USER` / `_PASSWORD`) | Resettable Windows Hyper-V review guest; networking is disconnected |
 | `TOR_SOCKS_HOST` / `TOR_SOCKS_PORT` | Tor gateway for `.onion` (default `127.0.0.1:9050`) |
 
 ---
@@ -224,7 +236,7 @@ Set `--profile` (agent) or `NAUTILUS_PROFILE` (MCP) at the start of a hunt to au
 ## Repo layout
 
 ```
-packages/   casefile · artifacts · acquisition · recon · swarm · identify · flash · tor · profiles · runtime
+packages/   casefile · artifacts · acquisition · recon · swarm · identify · flash · executable · tor · profiles · runtime
 apps/       agent (tool-use loop) · mcp (connector)
 deploy/     docker-compose.yml — the P2P backend stack
 skills/     lost-media-hunting — the methodology skill that drives the VM (+ references/)
@@ -248,6 +260,9 @@ Everything in the TypeScript core runs with just **Node 24** (`npm install` pull
 | **yt-dlp** | `download` of site-embedded media | `winget install yt-dlp.yt-dlp` / `pip install yt-dlp` |
 | **Docker audio matcher** | `audio_match` local-corpus comparison | `docker build -t nautilus-audio-match:local tools/audio-match` |
 | **Docker Flash reviewer** | `flash_review` runtime/full modes | `docker build -t nautilus-flash-review:local tools/flash-review` |
+| **Docker executable scanner + DOS worker** | `executable_review` static/DOS modes | build `tools/executable-static` and `tools/executable-dos` as shown above |
+| **gVisor (`runsc`)** | isolated Linux executable runs | install and register `runsc` with Docker; ordinary `runc` is deliberately rejected |
+| **Hyper-V review guest** | isolated Windows executable runs | configure `workers/windows-review/README.md`; the worker restores `NautilusClean` and disconnects networking |
 
 **API keys (env):** `ANTHROPIC_API_KEY` for the bundled agent; `ACOUSTID_KEY` for AcoustID fingerprint lookups. Wikipedia, Commons, Open Library, TVMaze, Internet Archive, Ahmia, and local SearXNG need no key. Prowlarr/qBittorrent credentials remain operator-provided.
 

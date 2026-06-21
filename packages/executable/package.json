@@ -1,0 +1,8 @@
+{
+  "name": "@aivm/executable",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Static analysis and isolated multi-platform review of executable artifacts.",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts" }
+}

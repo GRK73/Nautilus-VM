@@ -5,6 +5,7 @@ import type { Recon } from '../../recon/src/index.ts';
 import type { Swarm } from '../../swarm/src/index.ts';
 import type { Identifier } from '../../identify/src/index.ts';
 import type { FlashReviewer } from '../../flash/src/index.ts';
+import type { ExecutableReviewer } from '../../executable/src/index.ts';
 
 /** Minimal JSON Schema for a tool's input (Anthropic tool_use `input_schema`). */
 export interface JSONSchema {
@@ -66,6 +67,8 @@ export interface ToolContext {
   identifier: Identifier;
   /** Optional isolated Flash/SWF analysis surface. */
   flashReviewer?: FlashReviewer;
+  /** Optional static/sandboxed executable review surface. */
+  executableReviewer?: ExecutableReviewer;
   /** Optional: when set, `case_open`/`case_list` tools are exposed. */
   caseManager?: CaseManager;
 }

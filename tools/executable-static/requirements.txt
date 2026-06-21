@@ -1,0 +1,5 @@
+lief>=0.17,<0.18
+pefile>=2024.8
+yara-python>=4.5,<5
+flare-capa>=9,<10
+flare-floss>=3,<4
